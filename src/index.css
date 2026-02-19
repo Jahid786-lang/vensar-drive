@@ -1,0 +1,63 @@
+/* --- Tailwind + global theme (all @imports first) --- */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --font-display: 'Outfit', system-ui, -apple-system, sans-serif;
+  --font-body: 'Outfit', system-ui, -apple-system, sans-serif;
+
+  font-family: var(--font-body);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--text-primary, rgba(0, 0, 0, 0.87));
+  background-color: var(--app-bg, var(--background-default, #E0F2F1));
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  font-weight: 500;
+  color: var(--accent, var(--primary-main, #009688));
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent, var(--primary-main, #009688));
+  outline-offset: 2px;
+}
+
+/* Remove line below label in MUI outlined inputs (fieldset top border) */
+.MuiOutlinedInput-notchedOutline {
+  border-top: none !important;
+  border-top-width: 0 !important;
+}
+fieldset.MuiOutlinedInput-notchedOutline {
+  border-top: none !important;
+}

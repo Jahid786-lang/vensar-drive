@@ -1,0 +1,290 @@
+/* --- Login page: glassmorphism theme --- */
+
+.login-page {
+  --glass-bg: rgba(255, 255, 255, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --glass-inner: rgba(255, 255, 255, 0.15);
+  --blob-primary: rgba(0, 150, 136, 0.35);
+  --blob-secondary: rgba(77, 182, 172, 0.3);
+  background: linear-gradient(
+    145deg,
+    #e0f7fa 0%,
+    #b2dfdb 35%,
+    #80cbc4 70%,
+    #4db6ac 100%
+  );
+  background-attachment: fixed;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media (min-width: 600px) {
+  .login-page {
+    padding: 1.5rem;
+  }
+}
+
+/* Logo – glass pill */
+.login-illustration-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  pointer-events: none;
+  padding: 1.5rem 0 0 1.5rem;
+}
+
+.login-illustration {
+  max-width: min(42vw, 220px);
+  max-height: 88px;
+  object-fit: contain;
+  object-position: left top;
+  opacity: 0.98;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.06));
+}
+
+/* Optional: logo sits in a small glass pill */
+.login-logo-pill {
+  padding: 0.65rem 1rem;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Soft blobs – gradient orbs */
+.login-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.login-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+
+.login-blob-1 {
+  width: min(75vmin, 480px);
+  height: min(75vmin, 480px);
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.5) 0%,
+    var(--blob-primary) 50%,
+    var(--blob-secondary) 100%
+  );
+  top: -20%;
+  left: -15%;
+}
+
+.login-blob-2 {
+  width: min(60vmin, 360px);
+  height: min(60vmin, 360px);
+  background: radial-gradient(
+    circle at 60% 40%,
+    rgba(255, 255, 255, 0.4) 0%,
+    var(--blob-secondary) 50%,
+    var(--blob-primary) 100%
+  );
+  top: 35%;
+  right: -10%;
+}
+
+.login-blob-3 {
+  width: min(50vmin, 300px);
+  height: min(50vmin, 300px);
+  background: radial-gradient(
+    circle at 40% 60%,
+    var(--blob-primary) 0%,
+    rgba(255, 255, 255, 0.35) 100%
+  );
+  bottom: -15%;
+  left: 15%;
+}
+
+.login-blob-4 {
+  width: min(45vmin, 260px);
+  height: min(45vmin, 260px);
+  background: radial-gradient(
+    circle at 70% 30%,
+    rgba(255, 255, 255, 0.45) 0%,
+    var(--blob-primary) 100%
+  );
+  top: 10%;
+  right: 20%;
+}
+
+/* Main content – centered card */
+.login-main {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 440px;
+}
+
+/* Glass card */
+.login-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow:
+    var(--glass-shadow),
+    0 4px 24px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  padding: 1px;
+  transition: box-shadow 0.35s ease, transform 0.35s ease;
+}
+
+.login-glass:hover {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* .login-glass-inner {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 27px;
+  padding: 1.75rem 1.5rem 1.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  margin: 1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+} */
+
+@media (min-width: 600px) {
+  .login-glass-inner {
+    padding: 2.5rem 2.25rem 2.25rem;
+  }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.login-card-title {
+  margin: 0 0 0.35rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+  color: rgba(0, 0, 0, 0.88) !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.login-card-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-field {
+  width: 100%;
+}
+
+/* Inputs inside glass – subtle glass style */
+.login-glass-inner .MuiOutlinedInput-root {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 14px;
+}
+
+.login-glass-inner .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: rgba(0, 150, 136, 0.5);
+}
+
+.login-glass-inner .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: #009688;
+  border-width: 2px;
+}
+
+.login-actions {
+  margin-top: -0.25rem;
+  text-align: center;
+}
+
+.login-terms {
+  display: block;
+  margin: 1.25rem 0 0;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.55);
+  line-height: 1.5;
+}
+
+/* Bottom waves – soft gradient */
+.login-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30vh;
+  min-height: 200px;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.login-wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(178, 223, 219, 0.6) 40%,
+    rgba(128, 203, 196, 0.5) 100%
+  );
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  transform: translateX(-25%) scale(1.1);
+  animation: login-wave-float 14s ease-in-out infinite;
+}
+
+.login-wave-2 {
+  bottom: -5%;
+  opacity: 0.7;
+  background: linear-gradient(
+    135deg,
+    rgba(178, 223, 219, 0.5) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  animation-duration: 18s;
+  animation-delay: -4s;
+}
+
+@keyframes login-wave-float {
+  0%,
+  100% {
+    transform: translateX(-25%) scale(1.1);
+  }
+  50% {
+    transform: translateX(-18%) scale(1.12);
+  }
+}

@@ -1,0 +1,81 @@
+.dashboard-page {
+  min-height: 100vh;
+  background: var(--app-bg, var(--background-default, #E0F2F1));
+}
+
+.dashboard-header {
+  background: var(--background-paper, rgba(255, 255, 255, 0.9));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--primary-alpha20, rgba(0, 150, 136, 0.15));
+  box-shadow: 0 1px 12px rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-family: var(--font-display, 'Outfit', system-ui, sans-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--accent-dark, var(--primary-dark, #00796B));
+}
+
+.dashboard-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dashboard-user-name {
+  font-size: 0.9rem;
+  color: var(--text-secondary, rgba(0, 0, 0, 0.6));
+}
+
+.dashboard-logout {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: var(--accent, var(--primary-main, #009688));
+  background: var(--action-selected, var(--primary-alpha8, rgba(0, 150, 136, 0.08)));
+  border: 1px solid var(--primary-alpha25, rgba(0, 150, 136, 0.25));
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.dashboard-logout:hover {
+  background: var(--primary-alpha12, rgba(0, 150, 136, 0.12));
+  border-color: var(--primary-alpha18, rgba(0, 150, 136, 0.35));
+}
+
+.dashboard-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.dashboard-glass-card {
+  background: var(--background-paper, #ffffff);
+  border: 1px solid var(--primary-alpha20, rgba(0, 150, 136, 0.15));
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+.dashboard-glass-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.5rem;
+  color: var(--text-primary, rgba(0, 0, 0, 0.87));
+}
+
+.dashboard-glass-card p {
+  margin: 0;
+  color: var(--text-secondary, rgba(0, 0, 0, 0.6));
+}
