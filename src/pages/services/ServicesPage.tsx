@@ -43,8 +43,8 @@ function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (i
         sx={{
           width: '100%',
           height: '100%',
-          minHeight: 140,
-          p: 2,
+          minHeight: 120,
+          p: 1,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
