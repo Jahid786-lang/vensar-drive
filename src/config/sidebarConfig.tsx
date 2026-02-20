@@ -68,9 +68,9 @@ function baseMainItems(role: UserRole): SidebarNavItem[] {
     ],
   }
 
-  if (role === 'super_admin' || role === 'admin') {
-    return [servicesWithDropdown, usersWithDropdown, items[1]]
-  }
+  // if (role === 'super_admin' || role === 'admin') {
+  //   return [servicesWithDropdown, usersWithDropdown, items[1]]
+  // }
 
   return items
 }

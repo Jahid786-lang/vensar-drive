@@ -1,55 +1,35 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Box from '@mui/material/Box'
-import Button from '@mui/material/Button'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
 import SearchOutlined from '@mui/icons-material/SearchOutlined'
 import AppsOutlined from '@mui/icons-material/AppsOutlined'
-import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined'
 import ArrowForward from '@mui/icons-material/ArrowForward'
 import SearchOffOutlined from '@mui/icons-material/SearchOffOutlined'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useAppSelector } from '@/store/hooks'
 import { selectServicesList } from '@/store/servicesSlice'
-import { useAuth } from '@/contexts/AuthContext'
-import { isAdminOrAbove } from '@/constants/roles'
 import type { ServiceItem } from '@/data/servicesData'
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.03, delayChildren: 0.05 },
-  },
-}
-
-const itemMotion = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0 },
-}
 
 function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (id: string) => void }) {
   const Icon = service.icon
   return (
-    <motion.div variants={itemMotion} style={{ height: '100%' }}>
-      <Paper
+    <Paper
         component="button"
         type="button"
         variant="outlined"
         onClick={() => onSelect(service.id)}
         sx={{
           width: '100%',
-          height: '100%',
           minHeight: 140,
           p: 2,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 1,
+          gap: 0.5,
           cursor: 'pointer',
           border: '1px solid',
           borderColor: 'divider',
@@ -87,8 +67,8 @@ function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (i
           },
           '&:active': { transform: 'translateY(-2px)' },
         }}
-      >
-        <Box
+    >
+      <Box
           className="service-icon-wrap"
           sx={{
             width: 40,
@@ -132,17 +112,14 @@ function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (i
           </Typography>
           <ArrowForward sx={{ fontSize: 14 }} />
         </Box>
-      </Paper>
-    </motion.div>
+    </Paper>
   )
 }
 
 export function ServicesPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const servicesList = useAppSelector(selectServicesList)
-  const showCreateService = isAdminOrAbove(user?.role)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -153,28 +130,28 @@ export function ServicesPage() {
   return (
     <Box
       sx={{
-        // maxWidth: 1100,
+        maxWidth: 1120,
         mx: 'auto',
         width: '100%',
         minWidth: 0,
         // px: { xs: 2, sm: 3 },
-        // py: { xs: 2, sm: 3 },
+        py: { xs: 0.5, sm: 1 },
       }}
     >
       {/* Hero header */}
       <Box
         sx={{
-          mb: 4,
-          p: { xs: 2.5, sm: 2 },
+          mb: 2,
+          p: { xs: 1, sm: 0.5 },
           borderRadius: 2,
           background: (t) =>
             `linear-gradient(135deg, ${(t.palette.primary as unknown as Record<string, string>).alpha8 ?? 'rgba(0,150,136,0.08)'} 0%, ${(t.palette.primary as unknown as Record<string, string>).alpha12 ?? 'rgba(0,150,136,0.12)'} 100%)`,
-          border: '1px solid',
+          border: '0.5px solid',
           borderColor: 'primary.alpha20',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 0.5 }}>
           <Box
             sx={{
               width: 40,
@@ -187,7 +164,7 @@ export function ServicesPage() {
               justifyContent: 'center',
             }}
           >
-            <AppsOutlined sx={{ fontSize: 28 }} />
+            <AppsOutlined sx={{ fontSize: 20 }} />
           </Box>
           <Box>
             <Typography
@@ -196,12 +173,12 @@ export function ServicesPage() {
                 fontWeight: 600,
                 color: 'primary.dark',
                 letterSpacing: '-0.02em',
-                fontSize: { xs: '1rem', sm: '1.5rem', md: '1.75rem' },
+                fontSize: { xs: '0.25rem', sm: '0.5rem', md: '1rem' },
               }}
             >
               Services ({filtered.length})
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: { xs: '0.25rem', sm: '0.75rem' } }}>
               Choose a service to view related projects
             </Typography>
           </Box>
@@ -209,7 +186,7 @@ export function ServicesPage() {
 
         <TextField
           fullWidth
-          size="medium"
+          size="small"
           placeholder="Search services…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -223,7 +200,7 @@ export function ServicesPage() {
             },
           }}
           sx={{
-            mt: 2,
+            // mt: 2,
             maxWidth: { xs: '100%', sm: 380 },
             '& .MuiOutlinedInput-root': {
               borderRadius: 3,
@@ -239,74 +216,46 @@ export function ServicesPage() {
           }}
         />
         </Box>
-
       </Box>
 
-      {/* Results count + grid */}
-      {/* <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="body2" color="text.secondary" fontWeight={500}>
-          {filtered.length} {filtered.length === 1 ? 'service' : 'services'} available
-        </Typography>
-        {showCreateService && (
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddCircleOutlined />}
-            onClick={() => navigate('/services/create')}
-          >
-            Create Service
-          </Button>
-        )}
-      </Box> */}
-
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        style={{
+      <Box
+        sx={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-          gap: 20,
+          gap: 1.5,
         }}
       >
-        <AnimatePresence mode="popLayout">
-          {filtered.length ? (
-            filtered.map((service) => (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                onSelect={(id) => navigate(`/services/${id}`)}
-              />
-            ))
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              style={{ gridColumn: '1 / -1' }}
-            >
-              <Paper
-                variant="outlined"
-                sx={{
-                  textAlign: 'center',
-                  py: 8,
-                  px: 2,
-                  borderRadius: 3,
-                  bgcolor: 'action.hover',
-                  borderStyle: 'dashed',
-                }}
-              >
-                <SearchOffOutlined sx={{ fontSize: 56, color: 'text.disabled', mb: 1.5 }} />
-                <Typography variant="body1" color="text.secondary" fontWeight={500}>
-                  No services match &quot;{search}&quot;
-                </Typography>
-                <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
-                  Try a different search term
-                </Typography>
-              </Paper>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {filtered.length > 0 ? (
+          filtered.map((service) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              onSelect={(id) => navigate(`/services/${id}`)}
+            />
+          ))
+        ) : (
+          <Box
+            sx={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              py: 8,
+              px: 2,
+              borderRadius: 3,
+              bgcolor: 'action.hover',
+              border: '1px dashed',
+              borderColor: 'divider',
+            }}
+          >
+            <SearchOffOutlined sx={{ fontSize: 56, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" color="text.secondary" fontWeight={500}>
+              No services match &quot;{search}&quot;
+            </Typography>
+            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5 }}>
+              Try a different search term
+            </Typography>
+          </Box>
+        )}
+      </Box>
     </Box>
   )
 }

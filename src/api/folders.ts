@@ -1,7 +1,7 @@
 import { api } from '@/lib/api'
 import { buildFolderTree, type FlatFolder, type FolderNode } from '@/types/folder'
 
-/** Backend API: folders list (flat). Real backend pe yehi endpoint use karna. */
+/** Backend API: folders list (flat). */
 const FOLDERS_ENDPOINT = '/folders'
 
 export async function fetchFolders(): Promise<FlatFolder[]> {
@@ -10,8 +10,8 @@ export async function fetchFolders(): Promise<FlatFolder[]> {
 }
 
 /**
- * Mock data – jab backend ready na ho. Backend ready hone pe fetchFolders() use karo.
- * Structure: Irrigation > Projects > Kayampur > Civil/Mechanical/Electrical/Automation > Automation > ...
+ * Mock data – when backend is not ready.
+ * Structure: Irrigation > Projects > Kayampur > Civil/Mechanical/Electrical/Automation > ...
  */
 export function getMockFlatFolders(): FlatFolder[] {
   return [
@@ -27,17 +27,31 @@ export function getMockFlatFolders(): FlatFolder[] {
   ]
 }
 
-/** Tree ke liye: flat fetch karke buildFolderTree() chalana. Backend fail = caller catch karke mock use kare. */
+/** Build tree from flat list. On backend failure, caller can use mock. */
 export async function fetchFolderTree(): Promise<FolderNode[]> {
   const flat = await fetchFolders()
   return buildFolderTree(flat)
 }
 
-/** Backend: new folder create. POST /folders { parentId, name }. */
+/** Backend: new folder create. POST /folders { parentId?, name }. */
 export async function createFolder(payload: {
-  parentId: string
+  parentId?: string | null
   name: string
 }): Promise<FlatFolder> {
   const data = await api.post<FlatFolder>(FOLDERS_ENDPOINT, payload)
   return data
+}
+
+/** Backend: rename or move folder. PATCH /folders/:id */
+export async function updateFolder(
+  id: string,
+  payload: { name?: string; parentId?: string | null },
+): Promise<FlatFolder> {
+  const data = await api.patch<FlatFolder>(`${FOLDERS_ENDPOINT}/${id}`, payload)
+  return data
+}
+
+/** Backend: delete folder. DELETE /folders/:id */
+export async function deleteFolder(id: string): Promise<void> {
+  await api.delete(`${FOLDERS_ENDPOINT}/${id}`)
 }

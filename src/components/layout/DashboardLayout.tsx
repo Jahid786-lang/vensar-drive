@@ -8,7 +8,7 @@ import { SidebarProvider, useSidebar, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, TO
 
 interface DashboardLayoutProps {
   children: React.ReactNode,
-  title: string
+  title?: string
 }
 
 function DashboardLayoutInner({ children, title }: DashboardLayoutProps) {
@@ -19,15 +19,15 @@ function DashboardLayoutInner({ children, title }: DashboardLayoutProps) {
     <SidebarProvider isMobile={isMobile}>
       <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'grey.100' }}>
         <DashboardTopBar />
-       {title !== "Dashboard" && <DashboardSidebar />}
+        <DashboardSidebar />
         <DashboardMain>{children}</DashboardMain>
-        <DashboardFooter />
+        {/* <DashboardFooter /> */}
       </Box>
     </SidebarProvider>
   )
 }
 
-function DashboardMain({ children, title }: { children: React.ReactNode, title: string }) {
+function DashboardMain({ children }: { children: React.ReactNode }) {
   const theme = useTheme()
   const { sidebarOpen, isMobile } = useSidebar()
 
@@ -40,11 +40,11 @@ function DashboardMain({ children, title }: { children: React.ReactNode, title: 
         flexGrow: 1,
         mt: { xs: '56px', sm: `${TOP_BAR_HEIGHT}px` },
         ml: 0,
-        width: { xs: '100%', md: title !== "Dashboard" ? `calc(100% - ${sidebarWidth}px)` : '100%' },
+        width: { xs: '100%', md: `calc(100% - ${sidebarWidth}px)` },
         minHeight: { xs: 'calc(100vh - 56px)', sm: `calc(100vh - ${TOP_BAR_HEIGHT}px)` },
-        pt: { xs: 1, sm: 2 },
+        // pt: { xs: 1, sm: 2 },
         pb: 6,
-        px: { xs: 0.5, sm: 2 },
+        // px: { xs: 0.5, sm: 2 },
         transition: theme.transitions.create(['width', 'margin'], { duration: theme.transitions.duration.enteringScreen }),
       }}
     >

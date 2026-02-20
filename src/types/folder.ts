@@ -7,8 +7,9 @@ export interface FlatFolder {
   name: string
   parentId: string | null
   path?: string
-  /** Optional: order for sorting */
   order?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 /**

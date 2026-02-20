@@ -1,84 +1,280 @@
-import { useState } from "react";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import TextField from "@mui/material/TextField";
-import InputAdornment from "@mui/material/InputAdornment";
-import Button from "@mui/material/Button";
-import IconButton from "@mui/material/IconButton";
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
-import Paper from "@mui/material/Paper";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import SearchOutlined from "@mui/icons-material/SearchOutlined";
-import Add from "@mui/icons-material/Add";
-import CloudUploadOutlined from "@mui/icons-material/CloudUploadOutlined";
-// import GridViewOutlined from "@mui/icons-material/GridViewOutlined";
-import MoreVert from "@mui/icons-material/MoreVert";
-import FolderOutlined from "@mui/icons-material/FolderOutlined";
-import PictureAsPdfOutlined from "@mui/icons-material/PictureAsPdfOutlined";
-import ExpandMore from "@mui/icons-material/ExpandMore";
-import { mockFolders, mockFiles, type FileItem } from "@/data/mockFiles";
-import { DashboardLayout } from "../layout/DashboardLayout";
+import { useState, useRef } from 'react'
+import Box from '@mui/material/Box'
+import Typography from '@mui/material/Typography'
+import TextField from '@mui/material/TextField'
+import InputAdornment from '@mui/material/InputAdornment'
+import Button from '@mui/material/Button'
+import IconButton from '@mui/material/IconButton'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import Paper from '@mui/material/Paper'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
+import CircularProgress from '@mui/material/CircularProgress'
+import SearchOutlined from '@mui/icons-material/SearchOutlined'
+import Add from '@mui/icons-material/Add'
+import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined'
+import MoreVert from '@mui/icons-material/MoreVert'
+import FolderOutlined from '@mui/icons-material/FolderOutlined'
+import PictureAsPdfOutlined from '@mui/icons-material/PictureAsPdfOutlined'
+import ImageOutlined from '@mui/icons-material/ImageOutlined'
+import TableChartOutlined from '@mui/icons-material/TableChartOutlined'
+import SlideshowOutlined from '@mui/icons-material/SlideshowOutlined'
+import InsertDriveFileOutlined from '@mui/icons-material/InsertDriveFileOutlined'
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined'
+import ExpandMore from '@mui/icons-material/ExpandMore'
+import HomeOutlined from '@mui/icons-material/HomeOutlined'
+import ChevronRight from '@mui/icons-material/ChevronRight'
+import ViewListOutlined from '@mui/icons-material/ViewListOutlined'
+import ViewModuleOutlined from '@mui/icons-material/ViewModuleOutlined'
+import {
+  useDocuments,
+  useCreateFolder,
+  useUploadFile,
+  useRenameFile,
+  useDeleteFile,
+  useDeleteFolder,
+  useUpdateFolder,
+  useDownloadFile,
+} from '@/hooks/useDocuments'
+import { useFoldersFlat } from '@/hooks/useFoldersFlat'
+import { useToast } from '@/contexts/ToastContext'
+import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
+import { CreateFolderDialog } from './CreateFolderDialog'
+import { RenameDialog } from './RenameDialog'
+import type { DocumentFolder, DocumentFile } from '@/api/documentsApi'
 
-const fileTypeIcons: Record<FileItem["type"], React.ReactNode> = {
-  pdf: <PictureAsPdfOutlined sx={{ color: "error.dark" }} />,
-  dwg: (
-    <Box
-      component="span"
-      sx={{ width: 24, height: 24, bgcolor: "info.main", borderRadius: 0.5 }}
-    />
+const FILE_ICONS: Record<string, React.ReactNode> = {
+  'application/pdf': <PictureAsPdfOutlined sx={{ color: 'error.dark' }} />,
+  'image/png': <ImageOutlined sx={{ color: 'info.main' }} />,
+  'image/jpeg': <ImageOutlined sx={{ color: 'info.main' }} />,
+  'image/gif': <ImageOutlined sx={{ color: 'info.main' }} />,
+  'image/webp': <ImageOutlined sx={{ color: 'info.main' }} />,
+  'application/vnd.ms-excel': <TableChartOutlined sx={{ color: 'success.dark' }} />,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': (
+    <TableChartOutlined sx={{ color: 'success.dark' }} />
   ),
-  pptx: (
-    <Box
-      component="span"
-      sx={{ width: 24, height: 24, bgcolor: "warning.dark", borderRadius: 0.5 }}
-    />
+  'application/vnd.ms-powerpoint': <SlideshowOutlined sx={{ color: 'warning.dark' }} />,
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': (
+    <SlideshowOutlined sx={{ color: 'warning.dark' }} />
   ),
-  xlsx: (
-    <Box
-      component="span"
-      sx={{ width: 24, height: 24, bgcolor: "success.dark", borderRadius: 0.5 }}
-    />
-  ),
-  zip: <FolderOutlined sx={{ color: "grey.600" }} />,
-  folder: <FolderOutlined sx={{ color: "warning.main" }} />,
-};
+  'application/zip': <FolderOutlined sx={{ color: 'grey.600' }} />,
+}
 
-export function FileExplorer() {
+function getFileIcon(mimeType: string) {
+  return FILE_ICONS[mimeType] ?? (
+    <InsertDriveFileOutlined sx={{ color: 'grey.600' }} />
+  )
+}
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export interface FileExplorerProps {
+  /** Path for project view: /serviceId/projectId e.g. /irrigation/kayampur-sitamau. Omit for My Documents (root). */
+  projectPath?: string | null
+  /** Service ID - ensures documents are scoped to this service only */
+  serviceId?: string | null
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  if (diff < 60000) return 'Just now'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)} min ago`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)} hours ago`
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)} days ago`
+  return d.toLocaleDateString()
+}
+
+function formatDateShort(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`
+}
+
+function formatDateDisplay(iso?: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const now = new Date()
+  const diff = now.getTime() - d.getTime()
+  if (diff < 604800000) return formatDate(iso) // within 7 days: "X days ago"
+  return formatDateShort(iso) // else: "1/2/2026"
+}
+
+type ViewMode = 'list' | 'grid'
+
+export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {}) {
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [searchQuery, setSearchQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<{
-    anchor: HTMLElement;
-    file: FileItem;
-  } | null>(null);
-  const [newMenuAnchor, setNewMenuAnchor] = useState<null | HTMLElement>(null);
-  const [filterAnchor, setFilterAnchor] = useState<null | HTMLElement>(null);
+    anchor: HTMLElement
+    item: DocumentFolder | DocumentFile
+  } | null>(null)
+  const [newMenuAnchor, setNewMenuAnchor] = useState<null | HTMLElement>(null)
+  const [createFolderOpen, setCreateFolderOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameItem, setRenameItem] = useState<DocumentFolder | DocumentFile | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteItem, setDeleteItem] = useState<DocumentFolder | DocumentFile | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const { showToast } = useToast()
+  const { data, isLoading, error } = useDocuments(currentFolderId, projectPath, serviceId)
+  const { data: foldersFlat } = useFoldersFlat()
+  const createFolder = useCreateFolder(currentFolderId)
+  const uploadFile = useUploadFile(currentFolderId)
+  const renameFile = useRenameFile()
+  const renameFolder = useUpdateFolder()
+  const deleteFileMutation = useDeleteFile()
+  const deleteFolderMutation = useDeleteFolder()
+  const downloadFileMutation = useDownloadFile()
+
+  const folders = data?.folders ?? []
+  const files = data?.files ?? []
+  const rootFolder = data?.rootFolder ?? null
+
+  const breadcrumb = (() => {
+    if (!currentFolderId) {
+      if (projectPath && rootFolder) {
+        return [
+          { id: null, name: 'Home', path: '' },
+          { id: rootFolder.id, name: rootFolder.name, path: rootFolder.path },
+        ]
+      }
+      return [{ id: null, name: 'Home', path: '' }]
+    }
+    if (!foldersFlat) return [{ id: null, name: 'Home', path: '' }]
+    const map = new Map(foldersFlat.map((f) => [f.id, f]))
+    const chain: { id: string; name: string; path: string }[] = []
+    let curr = map.get(currentFolderId)
+    while (curr) {
+      chain.unshift({ id: curr.id, name: curr.name, path: curr.path ?? '' })
+      curr = curr.parentId ? map.get(curr.parentId) : undefined
+    }
+    return [{ id: null, name: 'Home', path: '' }, ...chain]
+  })()
+
+  const handleCreateFolder = async (name: string) => {
+    await createFolder.mutateAsync(name)
+    showToast('Folder created', 'success')
+  }
+
+  const handleUpload = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files
+    if (!selected?.length) return
+    try {
+      for (let i = 0; i < selected.length; i++) {
+        await uploadFile.mutateAsync(selected[i]!)
+      }
+      showToast(`${selected.length} file(s) uploaded`, 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Upload failed', 'error')
+    }
+    e.target.value = ''
+  }
+
+  const handleRename = async (newName: string) => {
+    if (!renameItem) return
+    if (renameItem.type === 'file') {
+      await renameFile.mutateAsync({ id: renameItem.id, name: newName })
+      showToast('File renamed', 'success')
+    } else {
+      await renameFolder.mutateAsync({ id: renameItem.id, name: newName })
+      showToast('Folder renamed', 'success')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteItem) return
+    try {
+      if (deleteItem.type === 'file') {
+        await deleteFileMutation.mutateAsync(deleteItem.id)
+        showToast('File deleted', 'success')
+      } else {
+        await deleteFolderMutation.mutateAsync(deleteItem.id)
+        showToast('Folder deleted', 'success')
+      }
+      setDeleteOpen(false)
+      setDeleteItem(null)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Delete failed', 'error')
+    }
+  }
+
+  const handleDownload = async (file: DocumentFile) => {
+    try {
+      await downloadFileMutation.mutateAsync({ id: file.id, name: file.name })
+      showToast('Download started', 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Download failed', 'error')
+    }
+  }
+
+  const openRename = (item: DocumentFolder | DocumentFile) => {
+    setRenameItem(item)
+    setRenameOpen(true)
+    setContextMenu(null)
+  }
+
+  const openDelete = (item: DocumentFolder | DocumentFile) => {
+    setDeleteItem(item)
+    setDeleteOpen(true)
+    setContextMenu(null)
+  }
+
+  const totalSize = files.reduce((acc, f) => acc + f.size, 0)
 
   return (
-    <Box sx={{ minWidth: 0, width: '100%', overflow: 'hidden' }}>
+    <Box sx={{ minWidth: 0, width: '100%', overflow: 'hidden', p: 1 }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleFileSelect}
+      />
+
       <Box
         sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          flexWrap: "wrap",
-          gap: 1,
-          mb: 2,
-          alignItems: { xs: "stretch", sm: "center" },
-          justifyContent: "space-between",
-          p: { xs: 0.5, sm: 1 },
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          flexWrap: 'wrap',
+          gap: 1.5,
+          mb: 1,
+          alignItems: { xs: 'stretch', sm: 'center' },
+          justifyContent: 'space-between',
+          p: 0.5,
           borderRadius: 2,
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
         }}
       >
         <TextField
           fullWidth
-          placeholder="Search in Automation"
+          placeholder="Search documents..."
           size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           slotProps={{
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchOutlined fontSize="small" color="action" />
+                  <SearchOutlined fontSize="small" sx={{ color: 'text.secondary' }} />
                 </InputAdornment>
               ),
             },
@@ -86,20 +282,51 @@ export function FileExplorer() {
           sx={{
             flex: { sm: '1 1 280px' },
             minWidth: 0,
-            maxWidth: { xs: "100%", sm: 480 },
-            "& .MuiOutlinedInput-root": {
-              bgcolor: "background.paper",
+            maxWidth: { xs: '100%', sm: 400 },
+            '& .MuiOutlinedInput-root': {
+              bgcolor: 'grey.50',
               borderRadius: 2,
+              '&:hover': { bgcolor: 'grey.100' },
+              '&.Mui-focused': { bgcolor: 'background.paper' },
             },
           }}
         />
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, minWidth: 0 }}>
-          {/* <IconButton
-            size="small"
-            sx={{ border: "1px solid", borderColor: "Boxider" }}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minWidth: 0, alignItems: 'center' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              bgcolor: 'grey.100',
+              borderRadius: 2,
+              p: 0.25,
+            }}
           >
-            <GridViewOutlined fontSize="small" />
-          </IconButton> */}
+            <IconButton
+              size="small"
+              onClick={() => setViewMode('list')}
+              sx={{
+                borderRadius: 1.5,
+                bgcolor: viewMode === 'list' ? 'white' : 'transparent',
+                boxShadow: viewMode === 'list' ? 1 : 0,
+                '&:hover': { bgcolor: viewMode === 'list' ? 'white' : 'grey.200' },
+              }}
+              title="List view"
+            >
+              <ViewListOutlined fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={() => setViewMode('grid')}
+              sx={{
+                borderRadius: 1.5,
+                bgcolor: viewMode === 'grid' ? 'white' : 'transparent',
+                boxShadow: viewMode === 'grid' ? 1 : 0,
+                '&:hover': { bgcolor: viewMode === 'grid' ? 'white' : 'grey.200' },
+              }}
+              title="Grid view"
+            >
+              <ViewModuleOutlined fontSize="small" />
+            </IconButton>
+          </Box>
           <Button
             variant="contained"
             size="small"
@@ -107,9 +334,16 @@ export function FileExplorer() {
             endIcon={<ExpandMore />}
             onClick={(e) => setNewMenuAnchor(e.currentTarget)}
             sx={{
-              textTransform: "none",
-              bgcolor: "success.main",
-              "&:hover": { bgcolor: "success.dark" },
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
+              px: 2,
+              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.35)',
+              bgcolor: 'success.main',
+              '&:hover': {
+                bgcolor: 'success.dark',
+                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.4)',
+              },
             }}
           >
             New
@@ -119,193 +353,616 @@ export function FileExplorer() {
             open={!!newMenuAnchor}
             onClose={() => setNewMenuAnchor(null)}
           >
-            <MenuItem onClick={() => setNewMenuAnchor(null)}>
+            <MenuItem
+              onClick={() => {
+                setNewMenuAnchor(null)
+                setCreateFolderOpen(true)
+              }}
+            >
               New Folder
-            </MenuItem>
-            <MenuItem onClick={() => setNewMenuAnchor(null)}>
-              New Document
             </MenuItem>
           </Menu>
           <Button
             variant="contained"
             size="small"
             startIcon={<CloudUploadOutlined />}
-            sx={{ textTransform: "none" }}
+            onClick={handleUpload}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: 2,
+              px: 2,
+              bgcolor: 'primary.main',
+              '&:hover': { bgcolor: 'primary.dark' },
+            }}
           >
             Upload
           </Button>
-          <IconButton
-            size="small"
-            sx={{ border: "1px solid", borderColor: "divider" }}
-            onClick={(e) => setFilterAnchor(e.currentTarget)}
-          >
-            <MoreVert fontSize="small" />
-          </IconButton>
-          <Menu
-            anchorEl={filterAnchor}
-            open={!!filterAnchor}
-            onClose={() => setFilterAnchor(null)}
-          >
-            <MenuItem onClick={() => setFilterAnchor(null)}>All</MenuItem>
-            <MenuItem onClick={() => setFilterAnchor(null)}>Size</MenuItem>
-            <MenuItem onClick={() => setFilterAnchor(null)}>name</MenuItem>
-          </Menu>
         </Box>
       </Box>
 
       <Box
-
         sx={{
-          display: "flex",
-          gap: { xs: 1, sm: 1 },
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
           mb: 1,
-          overflowX: "auto",
-          minWidth: 0,
-          pb: 0.5,
-          "&::-webkit-scrollbar": { display: "none" }, // hide scrollbar mobile
+          flexWrap: 'wrap',
+          py: 0.5,
+          px: 1,
+          borderRadius: 2,
+          bgcolor: 'grey.50',
         }}
       >
-        {mockFolders.map((folder) => (
-          <Paper
-            key={folder.id}
-            elevation={0}
-            sx={{
-              p: { xs: 1, sm: 0.5 },
-              minWidth: { xs: 70, sm: 80 },
-              flexShrink: 0,
-              borderRadius: 1.5,
-              border: "1px solid",
-              borderColor: "divider",
-              cursor: "pointer",
-              textAlign: "center",
-              transition: "0.2s",
-              "&:hover": {
-                bgcolor: "action.hover",
-                transform: "translateY(-2px)",
-              },
-            }}
-          >
-            <FolderOutlined
-              sx={{
-                fontSize: { xs: 32, sm: 36 },
-                color: "warning.main",
-              }}
-            />
-
+        <IconButton
+          size="small"
+          onClick={() => setCurrentFolderId(null)}
+          sx={{
+            borderRadius: 1.5,
+            '&:hover': { bgcolor: 'grey.200' },
+          }}
+        >
+          <HomeOutlined fontSize="small" />
+        </IconButton>
+        {breadcrumb.map((b, i) => (
+          <Box key={b.id ?? 'root'} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {i > 0 && (
+              <ChevronRight fontSize="small" sx={{ color: 'grey.400', fontSize: 18 }} />
+            )}
             <Typography
+              component="button"
+              variant="body2"
+              onClick={() => setCurrentFolderId(b.id)}
               sx={{
-                fontWeight: 400,
-                fontSize: { xs: "0.75rem", sm: "0.85rem" },
-                lineHeight: 1.2,
-                wordBreak: "break-word",
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: i === breadcrumb.length - 1 ? 'text.primary' : 'text.secondary',
+                fontWeight: i === breadcrumb.length - 1 ? 600 : 500,
+                py: 0.25,
+                px: 0.75,
+                borderRadius: 1,
+                '&:hover': {
+                  bgcolor: i < breadcrumb.length - 1 ? 'grey.200' : 'transparent',
+                  color: 'primary.main',
+                },
               }}
             >
-              {folder.name}
+              {b.name}
             </Typography>
-
-            <Typography
-              sx={{
-                fontSize: { xs: "0.6rem", sm: "0.65rem" },
-                color: "text.secondary",
-              }}
-            >
-              {folder.fileCount} Files
-            </Typography>
-          </Paper>
+          </Box>
         ))}
       </Box>
 
-      <Paper
-        elevation={0}
-        sx={{
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 2,
-          overflow: "hidden",
-        }}
-      >
-        <List disablePadding>
-          {mockFiles.map((file) => (
-            <ListItem
-              key={file.id}
-              divider
+      {isLoading ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            py: 8,
+            gap: 2,
+          }}
+        >
+          <CircularProgress size={40} sx={{ color: 'primary.main' }} />
+          <Typography variant="body2" color="text.secondary">
+            Loading documents...
+          </Typography>
+        </Box>
+      ) : error ? (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 4,
+            textAlign: 'center',
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: 'error.light',
+            bgcolor: 'rgba(211, 47, 47, 0.06)',
+          }}
+        >
+          <Typography color="error" fontWeight={600}>
+            {error instanceof Error ? error.message : 'Failed to load documents'}
+          </Typography>
+        </Paper>
+      ) : (
+        <>
+          {projectPath && !rootFolder && folders.length === 0 && files.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Create folder <strong>{projectPath.replace(/^\/+/, '').replace(/\//g, ' > ')}</strong> in My Documents to add files here.
+            </Typography>
+          )}
+
+          {folders.length === 0 && files.length === 0 && !projectPath && (
+            <Paper
+              elevation={0}
               sx={{
-                "&:hover": { bgcolor: "action.hover" },
-                "&:last-child": { borderBottom: "none" },
-                flexWrap: "wrap",
+                p: 6,
+                textAlign: 'center',
+                border: '2px dashed',
+                borderColor: 'grey.300',
+                borderRadius: 3,
+                bgcolor: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+                background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
               }}
-              secondaryAction={
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setContextMenu({ anchor: e.currentTarget, file });
+            >
+              <Box
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '50%',
+                  bgcolor: 'primary.alpha6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2,
+                }}
+              >
+                <CloudUploadOutlined sx={{ fontSize: 40, color: 'primary.main' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                No files yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Create a folder or upload files to get started
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  startIcon={<Add />}
+                  onClick={() => setCreateFolderOpen(true)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    borderWidth: 2,
+                    '&:hover': { borderWidth: 2 },
                   }}
                 >
-                  <MoreVert fontSize="small" />
-                </IconButton>
-              }
+                  New Folder
+                </Button>
+                <Button
+                  variant="contained"
+                  size="medium"
+                  startIcon={<CloudUploadOutlined />}
+                  onClick={handleUpload}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: 2,
+                    boxShadow: 2,
+                  }}
+                >
+                  Upload Files
+                </Button>
+              </Box>
+            </Paper>
+          )}
+
+          {(folders.length > 0 || files.length > 0) && (
+            viewMode === 'grid' ? (
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(auto-fill, minmax(90px, 1fr))',
+                  sm: 'repeat(auto-fill, minmax(100px, 1fr))',
+                  md: 'repeat(auto-fill, minmax(110px, 1fr))',
+                },
+                gap: { xs: 1.5, sm: 2 },
+                mb: 2,
+                // bgcolor: '#ffffff',
+                p: 2,
+                borderRadius: 1,
+              }}
             >
-              <ListItemIcon sx={{ minWidth: { xs: 36, sm: 40 } }}>
-                {fileTypeIcons[file.type]}
-              </ListItemIcon>
-              <ListItemText
-                primary={file.name}
-                secondary={
+              {folders.map((folder) => (
+                <Box
+                  key={folder.id}
+                  onClick={() => setCurrentFolderId(folder.id)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setContextMenu({ anchor: e.currentTarget as HTMLElement, item: folder })
+                  }}
+                  sx={{
+                    position: 'relative',
+                    py: 1.5,
+                    px: 0.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: 'rgba(253, 184, 19, 0.12)',
+                      transform: 'scale(1.05)',
+                      '& .grid-item-more': { opacity: 1 },
+                      '& .grid-folder-icon': { transform: 'scale(1.08)' },
+                    },
+                  }}
+                >
                   <Box
-                    component="span"
+                    className="grid-folder-icon"
                     sx={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: { xs: 0.5, sm: 2 },
-                      mt: 0.25,
+                      position: 'relative',
+                      width: 64,
+                      height: 64,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 1,
+                      transition: 'transform 0.2s ease',
                     }}
                   >
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      color="text.secondary"
+                    <FolderOutlined sx={{ fontSize: 56, color: '#FDB813' }} />
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 4,
+                        right: 6,
+                        width: 24,
+                        height: 24,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: 'white',
+                        borderRadius: 0.5,
+                        boxShadow: '0 0.5px 2px rgba(0,0,0,0.15)',
+                      }}
                     >
-                      {file.size}
-                    </Typography>
-                    <Typography
-                      component="span"
-                      variant="caption"
-                      color="text.secondary"
-                    >
-                      {file.modified}
-                    </Typography>
+                      <DescriptionOutlined sx={{ fontSize: 16, color: '#1976d2' }} />
+                    </Box>
                   </Box>
-                }
-                slotProps={{ primary: { fontWeight: 500, noWrap: true } }}
-              />
-            </ListItem>
-          ))}
-        </List>
-        <Menu
-          anchorEl={contextMenu?.anchor}
-          open={!!contextMenu}
-          onClose={() => setContextMenu(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <MenuItem onClick={() => setContextMenu(null)}>Open</MenuItem>
-          <MenuItem onClick={() => setContextMenu(null)}>Share</MenuItem>
-          <MenuItem onClick={() => setContextMenu(null)}>Download</MenuItem>
-          <MenuItem onClick={() => setContextMenu(null)}>Rename</MenuItem>
-          {/* <MenuItem onClick={() => setContextMenu(null)}>Move to (Shift + M)</MenuItem> */}
-          <MenuItem
-            onClick={() => setContextMenu(null)}
-            sx={{ color: "error.main" }}
-          >
-            Delete
-          </MenuItem>
-        </Menu>
-      </Paper>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      textAlign: 'center',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                      color: '#000',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    {folder.name}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    className="grid-item-more"
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      opacity: 0,
+                      p: 0.25,
+                      '&:hover': { bgcolor: 'grey.200' },
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setContextMenu({ anchor: e.currentTarget, item: folder })
+                    }}
+                  >
+                    <MoreVert sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Box>
+              ))}
+              {files.map((file) => (
+                <Box
+                  key={file.id}
+                  onClick={() => handleDownload(file)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setContextMenu({ anchor: e.currentTarget as HTMLElement, item: file })
+                  }}
+                  sx={{
+                    position: 'relative',
+                    py: 1.5,
+                    px: 0.5,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    borderRadius: 1,
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: 'rgba(25, 118, 210, 0.08)',
+                      transform: 'scale(1.05)',
+                      '& .grid-item-more': { opacity: 1 },
+                      '& .grid-file-icon': {
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        borderColor: 'primary.light',
+                      },
+                    },
+                  }}
+                >
+                  <Box
+                    className="grid-file-icon"
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 1,
+                      bgcolor: '#fff',
+                      border: '1px solid',
+                      borderColor: 'grey.300',
+                      borderRadius: 0.5,
+                      transition: 'all 0.2s ease',
+                      '& svg': { fontSize: 36 },
+                    }}
+                  >
+                    {getFileIcon(file.mimeType)}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 400,
+                      textAlign: 'center',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: '100%',
+                      color: '#000',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    {file.name}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    className="grid-item-more"
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      opacity: 0,
+                      p: 0.25,
+                      '&:hover': { bgcolor: 'grey.200' },
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setContextMenu({ anchor: e.currentTarget, item: file })
+                    }}
+                  >
+                    <MoreVert sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Paper
+              elevation={0}
+              sx={{
+                border: '1px solid',
+                borderColor: 'grey.200',
+                borderRadius: 3,
+                overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}
+            >
+              <List disablePadding>
+                {folders.map((folder) => (
+                  <ListItem
+                    key={folder.id}
+                    divider
+                    onClick={() => setCurrentFolderId(folder.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setContextMenu({ anchor: e.currentTarget as HTMLElement, item: folder })
+                    }}
+                    sx={{
+                      cursor: 'pointer',
+                      py: 1.5,
+                      '&:hover': { bgcolor: 'grey.50' },
+                      transition: 'background 0.2s ease',
+                    }}
+                    secondaryAction={
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setContextMenu({ anchor: e.currentTarget, item: folder })
+                        }}
+                        sx={{ borderRadius: 1 }}
+                      >
+                        <MoreVert fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 44 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 1.5,
+                          background: 'linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <FolderOutlined sx={{ color: 'white', fontSize: 22 }} />
+                      </Box>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={folder.name}
+                      secondary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+                          {(folder.childrenCount ?? 0) > 0 && (
+                            <Typography variant="caption" color="text.secondary">
+                              {folder.childrenCount} items
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDateDisplay(folder.updatedAt ?? folder.createdAt)}
+                          </Typography>
+                        </Box>
+                      }
+                      slotProps={{ primary: { fontWeight: 600, noWrap: true } }}
+                    />
+                  </ListItem>
+                ))}
+                {files.map((file) => (
+                  <ListItem
+                    key={file.id}
+                    divider
+                    onClick={() => handleDownload(file)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setContextMenu({ anchor: e.currentTarget as HTMLElement, item: file })
+                    }}
+                    sx={{
+                      cursor: 'pointer',
+                      py: 1.5,
+                      '&:hover': { bgcolor: 'grey.50' },
+                      transition: 'background 0.2s ease',
+                    }}
+                    secondaryAction={
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setContextMenu({ anchor: e.currentTarget, item: file })
+                        }}
+                        sx={{ borderRadius: 1 }}
+                      >
+                        <MoreVert fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemIcon sx={{ minWidth: 44 }}>
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 1.5,
+                          bgcolor: 'grey.100',
+                          border: '1px solid',
+                          borderColor: 'grey.200',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          '& svg': { fontSize: 20 },
+                        }}
+                      >
+                        {getFileIcon(file.mimeType)}
+                      </Box>
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={file.name}
+                      secondary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.25 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatSize(file.size)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {formatDateDisplay(file.uploadedAt ?? file.updatedAt)}
+                          </Typography>
+                        </Box>
+                      }
+                      slotProps={{ primary: { fontWeight: 600, noWrap: true } }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          )
+          )}
 
-      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-        {mockFiles.length} files 27.4 MB
-      </Typography>
+          <Menu
+              anchorEl={contextMenu?.anchor}
+              open={!!contextMenu}
+              onClose={() => setContextMenu(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              {contextMenu?.item.type === 'file' && (
+                <MenuItem
+                  onClick={() => {
+                    handleDownload(contextMenu.item as DocumentFile)
+                    setContextMenu(null)
+                  }}
+                >
+                  Download
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => openRename(contextMenu!.item)}>Rename</MenuItem>
+              <MenuItem
+                onClick={() => openDelete(contextMenu!.item)}
+                sx={{ color: 'error.main' }}
+              >
+                Delete
+              </MenuItem>
+            </Menu>
+
+          <Box
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              right: 24,
+              py: 1,
+              px: 1.5,
+              borderRadius: 2,
+              bgcolor: 'grey.50',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              border: '1px solid',
+              borderColor: 'grey.200',
+              zIndex: 10,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" fontWeight={500}>
+              {folders.length} folder{folders.length !== 1 ? 's' : ''} · {files.length} file
+              {files.length !== 1 ? 's' : ''} · {formatSize(totalSize)}
+            </Typography>
+          </Box>
+        </>
+      )}
+
+      <CreateFolderDialog
+        open={createFolderOpen}
+        onClose={() => setCreateFolderOpen(false)}
+        onSubmit={handleCreateFolder}
+        loading={createFolder.isPending}
+      />
+
+      <RenameDialog
+        open={renameOpen}
+        name={renameItem?.name ?? ''}
+        onClose={() => {
+          setRenameOpen(false)
+          setRenameItem(null)
+        }}
+        onSubmit={handleRename}
+        loading={renameFile.isPending || renameFolder.isPending}
+      />
+
+      <ConfirmationModal
+        open={deleteOpen}
+        title="Delete"
+        message={
+          deleteItem
+            ? `Are you sure you want to delete "${deleteItem.name}"? This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmColor="error"
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setDeleteOpen(false)
+          setDeleteItem(null)
+        }}
+        loading={deleteFileMutation.isPending || deleteFolderMutation.isPending}
+      />
     </Box>
-  );
+  )
 }

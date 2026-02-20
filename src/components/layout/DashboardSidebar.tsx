@@ -5,10 +5,8 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Divider from "@mui/material/Divider";
 import Collapse from "@mui/material/Collapse";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import ExpandLess from "@mui/icons-material/ExpandLess";
@@ -62,9 +60,6 @@ export function DashboardSidebar() {
     });
   }, []);
 
-  // const { data: folderTree = [], isLoading, refetch } = useFolders();
-  // const [openIds, setOpenIds] = useState<Set<string>>(new Set(["irrigation"]));
-
   const drawerWidth = isMobile
     ? 280
     : sidebarOpen
@@ -82,30 +77,6 @@ export function DashboardSidebar() {
     navigate("/login", { state: { from: { pathname: "/" } }, replace: true });
     logout();
   };
-
-  // const handleToggle = useCallback((id: string) => {
-  //   setOpenIds((prev) => {
-  //     const next = new Set(prev);
-  //     if (next.has(id)) next.delete(id);
-  //     else next.add(id);
-  //     return next;
-  //   });
-  // }, []);
-
-  // const handleAddFolder = useCallback(
-  //   async (parentId: string) => {
-  //     const name = window.prompt("Folder name");
-  //     if (!name?.trim()) return;
-  //     try {
-  //       await createFolder({ parentId, name: name.trim() });
-  //       setOpenIds((prev) => new Set(prev).add(parentId));
-  //       refetch();
-  //     } catch {
-  //       refetch();
-  //     }
-  //   },
-  //   [refetch]
-  // );
 
   const content = (
     <Box
@@ -285,7 +256,7 @@ export function DashboardSidebar() {
             );
           })}
         </List> */}
-        <Divider sx={{ my: 0.5, mx: 1 }} />
+        {/* <Divider sx={{ my: 0.5, mx: 1 }} /> */}
         <List disablePadding>
           <ListItemButton
             onClick={handleLogout}

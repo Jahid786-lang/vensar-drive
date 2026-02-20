@@ -1,32 +1,70 @@
-import { Link as RouterLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Typography from '@mui/material/Typography'
+import Menu from '@mui/material/Menu'
+import MenuItem from '@mui/material/MenuItem'
+import ListItemIcon from '@mui/material/ListItemIcon'
+import ListItemText from '@mui/material/ListItemText'
 import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import HamburgerIcon from '@mui/icons-material/Menu'
+import ArrowDropDown from '@mui/icons-material/ArrowDropDown'
+import PersonAddOutlined from '@mui/icons-material/PersonAddOutlined'
+import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined'
+import PeopleOutlined from '@mui/icons-material/PeopleOutlined'
+import SettingsOutlined from '@mui/icons-material/SettingsOutlined'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSidebar } from './SidebarContext'
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { isAdminOrAbove } from '@/constants/roles'
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'
 
 const navLinks = [
   { label: 'Dashboard', path: '/' },
   { label: 'Documents', path: '/documents' },
-  // { label: 'Profile', path: '/profile' },
-  { label: 'Reports', path: '/reports' },
-  { label: 'Admin', path: '/admin' },
 ]
+
+const adminOnlyNavLinks = [
+  { label: 'Events', path: '/events' },
+]
+
+const configMenuItems = [
+  { label: 'Add User', path: '/users/create', icon: PersonAddOutlined },
+  { label: 'Add Service', path: '/services/create', icon: AddCircleOutlined },
+  { label: 'All Users', path: '/users', icon: PeopleOutlined },
+  { label: 'Admin', path: '/admin', icon: SettingsOutlined },
+]
+
+function isLinkActive(path: string, pathname: string): boolean {
+  if (path === '/') return pathname === '/'
+  return pathname === path || pathname.startsWith(path + '/')
+}
+
+function isConfigActive(pathname: string): boolean {
+  return configMenuItems.some((item) => pathname === item.path || pathname.startsWith(item.path + '/'))
+}
 
 export function DashboardTopBar() {
   const theme = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
   const isMobile = !useMediaQuery(theme.breakpoints.up('md'))
   const { user } = useAuth()
   const { setMobileOpen } = useSidebar()
- 
+  const [configAnchor, setConfigAnchor] = useState<null | HTMLElement>(null)
+  const showAdminNav = isAdminOrAbove(user?.role)
+
+  const handleConfigOpen = (e: React.MouseEvent<HTMLElement>) => setConfigAnchor(e.currentTarget)
+  const handleConfigClose = () => setConfigAnchor(null)
+  const handleConfigItem = (path: string) => {
+    navigate(path)
+    handleConfigClose()
+  }
+
   return (
     <AppBar
       position="fixed"
@@ -52,24 +90,91 @@ export function DashboardTopBar() {
         </Box>
 
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, marginLeft: 'auto' }}>
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 0.5, flex: 1 }}>
-          {navLinks.map((link) => (
-            <Button
-              key={link.path}
-              component={RouterLink}
-              to={link.path}
-              sx={{
-                color: 'text.secondary',
-                textTransform: 'none',
-                fontWeight: 500,
-                '&:hover': { color: 'primary.main', bgcolor: 'action.hover' },
-              }}
-            >
-              {link.label}
-            </Button>
-          ))}
+          {navLinks.map((link) => {
+            const active = isLinkActive(link.path, location.pathname)
+            return (
+              <Button
+                key={link.path}
+                component={RouterLink}
+                to={link.path}
+                sx={{
+                  color: active ? 'primary.main' : 'text.secondary',
+                  textTransform: 'none',
+                  fontWeight: active ? 600 : 500,
+                  borderBottom: active ? '2px solid' : 'none',
+                  borderColor: 'primary.main',
+                  borderRadius: 0,
+                  '&:hover': { color: 'primary.main', bgcolor: 'action.hover' },
+                }}
+              >
+                {link.label}
+              </Button>
+            )
+          })}
+          {showAdminNav &&
+            adminOnlyNavLinks.map((link) => {
+              const active = isLinkActive(link.path, location.pathname)
+              return (
+                <Button
+                  key={link.path}
+                  component={RouterLink}
+                  to={link.path}
+                  sx={{
+                    color: active ? 'primary.main' : 'text.secondary',
+                    textTransform: 'none',
+                    fontWeight: active ? 600 : 500,
+                    borderBottom: active ? '2px solid' : 'none',
+                    borderColor: 'primary.main',
+                    borderRadius: 0,
+                    '&:hover': { color: 'primary.main', bgcolor: 'action.hover' },
+                  }}
+                >
+                  {link.label}
+                </Button>
+              )
+            })}
+          {showAdminNav && (
+            <>
+              <Button
+                onClick={handleConfigOpen}
+                endIcon={<ArrowDropDown />}
+                sx={{
+                  color: isConfigActive(location.pathname) ? 'primary.main' : 'text.secondary',
+                  textTransform: 'none',
+                  fontWeight: isConfigActive(location.pathname) ? 600 : 500,
+                  borderBottom: isConfigActive(location.pathname) ? '2px solid' : 'none',
+                  borderColor: 'primary.main',
+                  borderRadius: 0,
+                  '&:hover': { color: 'primary.main', bgcolor: 'action.hover' },
+                }}
+              >
+                Configuration
+              </Button>
+              <Menu
+                anchorEl={configAnchor}
+                open={Boolean(configAnchor)}
+                onClose={handleConfigClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                slotProps={{ paper: { sx: { minWidth: 200 } } }}
+              >
+                {configMenuItems.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <MenuItem key={item.path} onClick={() => handleConfigItem(item.path)}>
+                      <ListItemIcon>
+                        <Icon fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText>{item.label}</ListItemText>
+                    </MenuItem>
+                  )
+                })}
+              </Menu>
+            </>
+          )}
         </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, marginLeft: 'auto' }}>
           <Button
             onClick={() => navigate('/profile')}
             size="small"

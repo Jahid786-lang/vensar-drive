@@ -38,6 +38,6 @@ export function useSidebar() {
   return ctx
 }
 
-export const SIDEBAR_WIDTH = 220
+export const SIDEBAR_WIDTH = 170
 export const SIDEBAR_COLLAPSED_WIDTH = 56
 export const TOP_BAR_HEIGHT = 64

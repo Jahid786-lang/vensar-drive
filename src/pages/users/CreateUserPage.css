@@ -1,0 +1,53 @@
+.create-user-page {
+  min-height: 100%;
+  background: linear-gradient(160deg, var(--accent-soft, rgba(0, 150, 136, 0.04)) 0%, var(--background-default, #f5faf9) 50%);
+}
+
+.create-user-header-card {
+  background: linear-gradient(135deg, var(--primary-main) 0%, var(--primary-dark, #00695c) 100%);
+  color: #fff;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 24px rgba(0, 150, 136, 0.25);
+}
+
+.create-user-header-icon-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.create-user-section-panel {
+  background: var(--background-paper);
+  border: 1px solid var(--divider);
+  border-radius: 12px;
+  padding: 20px;
+  height: 100%;
+  border-left: 4px solid var(--primary-main);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.create-user-section-panel.account {
+  border-left-color: var(--primary-light, #4db6ac);
+}
+
+.create-user-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.create-user-form-card {
+  border-radius: 16px;
+  border: 1px solid var(--divider);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}

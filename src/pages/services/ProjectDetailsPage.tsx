@@ -15,12 +15,13 @@ import { useState } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { getProjectsByServiceId } from '@/data/serviceProjects'
 import { getProjectDetails, type ProjectDetailsData } from '@/data/projectDetails'
+import { FileExplorer } from '@/components/documnets/FileExplorer'
 
 const TAB_LABELS = [
   'Project Details',
-  'Execution Summary',
-  'Erection & Commissioning',
-  'SCADA Monitoring',
+  // 'Execution Summary',
+  // 'Erection & Commissioning',
+  // 'SCADA Monitoring',
   'Documents',
 ]
 
@@ -70,7 +71,7 @@ export function ProjectDetailsPage() {
             flex: 1,
             minWidth: 0,
             overflow: 'hidden',
-            borderRadius: 3,
+            // borderRadius: 3,
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
@@ -148,7 +149,7 @@ export function ProjectDetailsPage() {
             ))}
           </Tabs>
 
-          <Box sx={{ p: { xs: 2, sm: 3 } }}>
+          <Box sx={{ p: { xs: 1, sm: 2 } }}>
             {tab === 0 && (
               <>
                 <Box
@@ -211,9 +212,9 @@ export function ProjectDetailsPage() {
 
                 <Box
                   sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    gap: 2,
+                    // display: 'grid',
+                    // gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                    // gap: 2,
                     mb: 3,
                   }}
                 >
@@ -225,7 +226,7 @@ export function ProjectDetailsPage() {
                       {details.workScope}
                     </Typography>
                   </Paper>
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                  {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
                       Payment Terms
                     </Typography>
@@ -242,7 +243,7 @@ export function ProjectDetailsPage() {
                         —
                       </Typography>
                     )}
-                  </Paper>
+                  </Paper> */}
                 </Box>
 
                 {details.majorComponents.length > 0 && (
@@ -285,7 +286,14 @@ export function ProjectDetailsPage() {
                 )}
               </>
             )}
-            {tab !== 0 && (
+            {tab === 1 && (
+              <FileExplorer
+                key={`${serviceId}-${projectId}`}
+                projectPath={`/${serviceId}/${projectId}`}
+                serviceId={serviceId}
+              />
+            )}
+            {tab > 1 && (
               <Box sx={{ py: 4, textAlign: 'center' }}>
                 <Typography color="text.secondary">
                   {TAB_LABELS[tab]} — Coming soon
