@@ -176,7 +176,7 @@ export function ProjectDetailsPage() {
                       {details.contractor}
                     </Typography>
                   </Box>
-                  <Box>
+                  {/* <Box>
                     <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
                       Work Order No
                     </Typography>
@@ -191,13 +191,13 @@ export function ProjectDetailsPage() {
                     <Typography variant="body1" sx={highlightSx}>
                       {details.date}
                     </Typography>
-                  </Box>
+                  </Box> */}
                   <Box>
                     <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Contract Value
+                      Total Flow Rate
                     </Typography>
                     <Typography variant="body1" sx={highlightSx}>
-                      ₹ {details.contractValue}
+                      {details.totalFlowRate} m³/h
                     </Typography>
                   </Box>
                   <Box>
@@ -258,7 +258,7 @@ export function ProjectDetailsPage() {
                     >
                       <Table size="small" sx={{ minWidth: 280 }}>
                         <TableHead>
-                          <TableRow sx={{ bgcolor: 'action.hover' }}>
+                          <TableRow sx={{ bgcolor: 'action.hover', }}>
                             <TableCell sx={{ fontWeight: 600 }}>Sr No</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>Component</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 600 }}>

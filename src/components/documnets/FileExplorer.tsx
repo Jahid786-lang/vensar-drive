@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
@@ -13,6 +13,7 @@ import ListItem from '@mui/material/ListItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import ListItemText from '@mui/material/ListItemText'
 import CircularProgress from '@mui/material/CircularProgress'
+import LinearProgress from '@mui/material/LinearProgress'
 import SearchOutlined from '@mui/icons-material/SearchOutlined'
 import Add from '@mui/icons-material/Add'
 import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined'
@@ -41,6 +42,8 @@ import {
 } from '@/hooks/useDocuments'
 import { useFoldersFlat } from '@/hooks/useFoldersFlat'
 import { useToast } from '@/contexts/ToastContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { isAdminOrAbove } from '@/constants/roles'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { RenameDialog } from './RenameDialog'
@@ -113,7 +116,7 @@ type ViewMode = 'list' | 'grid'
 
 export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {}) {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchQuery, setSearchQuery] = useState('')
   const [contextMenu, setContextMenu] = useState<{
     anchor: HTMLElement
@@ -125,12 +128,19 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
   const [renameItem, setRenameItem] = useState<DocumentFolder | DocumentFile | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<DocumentFolder | DocumentFile | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<{ percent: number; currentFile?: string } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const { showToast } = useToast()
+  const { user } = useAuth()
+
+  /** Upload/create only in project documents, and only for admin/super_admin */
+  const canUpload = !!projectPath && isAdminOrAbove(user?.role)
+  console.log("currentFolderId>>>", currentFolderId)
   const { data, isLoading, error } = useDocuments(currentFolderId, projectPath, serviceId)
   const { data: foldersFlat } = useFoldersFlat()
-  const createFolder = useCreateFolder(currentFolderId)
+  const createFolder = useCreateFolder(currentFolderId, projectPath, serviceId)
   const uploadFile = useUploadFile(currentFolderId)
   const renameFile = useRenameFile()
   const renameFolder = useUpdateFolder()
@@ -169,22 +179,77 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
   }
 
   const handleUpload = () => {
+    if (!canUpload) return
     fileInputRef.current?.click()
   }
+
+  const processFiles = useCallback(
+    async (fileList: FileList | File[]) => {
+      const files = Array.from(fileList)
+      if (!files.length || !canUpload) return
+      setUploadProgress({ percent: 0, currentFile: files[0]?.name })
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]!
+          setUploadProgress({
+            percent: Math.round((i / files.length) * 100),
+            currentFile: file.name,
+          })
+          await uploadFile.mutateAsync({
+            file,
+            onProgress: (p) => {
+              const base = (i / files.length) * 100
+              const contribution = (p / 100) * (1 / files.length) * 100
+              setUploadProgress({ percent: Math.round(base + contribution), currentFile: file.name })
+            },
+          })
+        }
+        setUploadProgress({ percent: 100, currentFile: files[files.length - 1]?.name })
+        showToast(`${files.length} file(s) uploaded`, 'success')
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Upload failed', 'error')
+      } finally {
+        setTimeout(() => setUploadProgress(null), 800)
+      }
+    },
+    [canUpload, uploadFile, showToast],
+  )
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
     if (!selected?.length) return
-    try {
-      for (let i = 0; i < selected.length; i++) {
-        await uploadFile.mutateAsync(selected[i]!)
-      }
-      showToast(`${selected.length} file(s) uploaded`, 'success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Upload failed', 'error')
-    }
+    await processFiles(selected)
     e.target.value = ''
   }
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent) => {
+      if (!canUpload) return
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(true)
+    },
+    [canUpload],
+  )
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }, [])
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      if (!canUpload) return
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragging(false)
+      const files = e.dataTransfer.files
+      if (!files?.length) return
+      await processFiles(files)
+    },
+    [canUpload, processFiles],
+  )
 
   const handleRename = async (newName: string) => {
     if (!renameItem) return
@@ -236,9 +301,50 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
   }
 
   const totalSize = files.reduce((acc, f) => acc + f.size, 0)
-
   return (
-    <Box sx={{ minWidth: 0, width: '100%', overflow: 'hidden', p: 1 }}>
+    <Box
+      sx={{ minWidth: 0, width: '100%', overflow: 'hidden', p: 1, position: 'relative' }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && canUpload && (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 20,
+            bgcolor: 'rgba(25, 118, 210, 0.08)',
+            border: '3px dashed',
+            borderColor: 'primary.main',
+            borderRadius: 2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <Paper
+            elevation={4}
+            sx={{
+              p: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+              bgcolor: 'background.paper',
+            }}
+          >
+            <CloudUploadOutlined sx={{ fontSize: 48, color: 'primary.main' }} />
+            <Typography variant="h6" fontWeight={600}>
+              Drop files to upload
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Release to add files to this folder
+            </Typography>
+          </Paper>
+        </Box>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -327,57 +433,61 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
               <ViewModuleOutlined fontSize="small" />
             </IconButton>
           </Box>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<Add />}
-            endIcon={<ExpandMore />}
-            onClick={(e) => setNewMenuAnchor(e.currentTarget)}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: 2,
-              px: 2,
-              boxShadow: '0 2px 8px rgba(34, 197, 94, 0.35)',
-              bgcolor: 'success.main',
-              '&:hover': {
-                bgcolor: 'success.dark',
-                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.4)',
-              },
-            }}
-          >
-            New
-          </Button>
-          <Menu
-            anchorEl={newMenuAnchor}
-            open={!!newMenuAnchor}
-            onClose={() => setNewMenuAnchor(null)}
-          >
-            <MenuItem
-              onClick={() => {
-                setNewMenuAnchor(null)
-                setCreateFolderOpen(true)
-              }}
-            >
-              New Folder
-            </MenuItem>
-          </Menu>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<CloudUploadOutlined />}
-            onClick={handleUpload}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              borderRadius: 2,
-              px: 2,
-              bgcolor: 'primary.main',
-              '&:hover': { bgcolor: 'primary.dark' },
-            }}
-          >
-            Upload
-          </Button>
+          {canUpload && (
+            <>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<Add />}
+                endIcon={<ExpandMore />}
+                onClick={(e) => setNewMenuAnchor(e.currentTarget)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  px: 2,
+                  boxShadow: '0 2px 8px rgba(34, 197, 94, 0.35)',
+                  bgcolor: 'success.main',
+                  '&:hover': {
+                    bgcolor: 'success.dark',
+                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.4)',
+                  },
+                }}
+              >
+                New
+              </Button>
+              <Menu
+                anchorEl={newMenuAnchor}
+                open={!!newMenuAnchor}
+                onClose={() => setNewMenuAnchor(null)}
+              >
+                <MenuItem
+                  onClick={() => {
+                    setNewMenuAnchor(null)
+                    setCreateFolderOpen(true)
+                  }}
+                >
+                  New Folder
+                </MenuItem>
+              </Menu>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<CloudUploadOutlined />}
+                onClick={handleUpload}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: 2,
+                  px: 2,
+                  bgcolor: 'primary.main',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                Upload
+              </Button>
+            </>
+          )}
         </Box>
       </Box>
 
@@ -434,6 +544,46 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         ))}
       </Box>
 
+      {projectPath && !canUpload && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+          Only Admin and Super Admin can upload or create folders.
+        </Typography>
+      )}
+
+      {uploadProgress && (
+        <Paper
+          elevation={2}
+          sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'primary.light',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+            <CloudUploadOutlined color="primary" />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="body2" fontWeight={600}>
+                Uploading{uploadProgress.currentFile ? `: ${uploadProgress.currentFile}` : ''}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {uploadProgress.percent}%
+              </Typography>
+            </Box>
+            <Typography variant="h6" fontWeight={700} color="primary.main">
+              {uploadProgress.percent}%
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={uploadProgress.percent}
+            sx={{ height: 8, borderRadius: 1 }}
+          />
+        </Paper>
+      )}
+
       {isLoading ? (
         <Box
           sx={{
@@ -470,7 +620,9 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         <>
           {projectPath && !rootFolder && folders.length === 0 && files.length === 0 && (
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Create folder <strong>{projectPath.replace(/^\/+/, '').replace(/\//g, ' > ')}</strong> in My Documents to add files here.
+              {canUpload
+                ? `Create folder ${projectPath.replace(/^\/+/, '').replace(/\//g, ' > ')} to add files here.`
+                : 'No documents in this project yet.'}
             </Typography>
           )}
 
@@ -483,7 +635,6 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
                 border: '2px dashed',
                 borderColor: 'grey.300',
                 borderRadius: 3,
-                bgcolor: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
                 background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
               }}
             >
@@ -503,42 +654,11 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
                 <CloudUploadOutlined sx={{ fontSize: 40, color: 'primary.main' }} />
               </Box>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                No files yet
+                My Documents
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Create a folder or upload files to get started
+                Upload and create folders only from project Documents. Go to Services → Project → Documents tab.
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  size="medium"
-                  startIcon={<Add />}
-                  onClick={() => setCreateFolderOpen(true)}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    borderWidth: 2,
-                    '&:hover': { borderWidth: 2 },
-                  }}
-                >
-                  New Folder
-                </Button>
-                <Button
-                  variant="contained"
-                  size="medium"
-                  startIcon={<CloudUploadOutlined />}
-                  onClick={handleUpload}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderRadius: 2,
-                    boxShadow: 2,
-                  }}
-                >
-                  Upload Files
-                </Button>
-              </Box>
             </Paper>
           )}
 

@@ -23,6 +23,7 @@ export async function fetchFiles(folderId: string | null): Promise<FileItem[]> {
 export async function uploadFile(
   file: File,
   folderId: string | null,
+  onProgress?: (percent: number) => void,
 ): Promise<FileItem> {
   const formData = new FormData()
   formData.append('file', file)
@@ -35,6 +36,11 @@ export async function uploadFile(
     {
       headers: {
         'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (e) => {
+        if (e.total && onProgress) {
+          onProgress(Math.round((e.loaded / e.total) * 100))
+        }
       },
     },
   )

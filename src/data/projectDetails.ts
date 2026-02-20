@@ -14,7 +14,7 @@ export interface ProjectDetailsData {
   title: string
   client: string
   workOrderNo: string
-  contractValue: string
+  totalFlowRate: string
   contractor: string
   date: string
   totalCca: string
@@ -29,13 +29,13 @@ const detailsStore: Record<string, ProjectDetailsData> = {
     name: 'KAYAMPUR SITAMAU PRESSURIZED MICRO LIFT MAJOR IRRIGATION PROJECT',
     stateCode: 'MP',
     title: 'Kayampur Sitamau PILMI – Project Summary',
-    client: 'Water Resources Department',
+    client: 'Water Resources Department (MP)',
     workOrderNo: 'EI557WOD0000035',
-    contractValue: '1,66,16,16,928.88',
+    totalFlowRate: '133203.31',
     contractor: 'VENSAR MP JV',
     date: '15 Jan 2025',
-    totalCca: '11,2124.00 HA',
-    workScope: `Design, supply, erection, testing and commissioning of distribution management and filtration systems including control management, air management system and automation (PLC, sensors). Scope covers primary and secondary filtration works, pumping station, BPT, OMS, AMS, remote management system, central control room and LORA gateway.`,
+    totalCca: '1,12,124.00 HA',
+    workScope: `Design, supply, erection, testing and commissioning of distribution management and pump house automation (PLC & SCADA, instruments) including the filtration systems and control management. Scope covers pumping station, DC, primary filtration, OMS, RMS, LORA gateway and master central control room.`,
     paymentTerms: [
       '5% after detailed design approval',
       '70% after receipt of material at site',
@@ -43,14 +43,14 @@ const detailsStore: Record<string, ProjectDetailsData> = {
       '5% after clearance of final punch list',
     ],
     majorComponents: [
-      { srNo: 1, component: 'Pumping Station', qty: 2 },
-      { srNo: 2, component: 'BPT', qty: 3 },
+      { srNo: 1, component: 'Number of Pumping Station', qty: 2 },
+      { srNo: 2, component: 'Delivery Chamber (DC)', qty: 1 },
       { srNo: 3, component: 'Outlet Management System (OMS)', qty: 3841 },
-      { srNo: 4, component: 'Air Management System (AMS)', qty: 399 },
+      // { srNo: 4, component: 'Air Management System (AMS)', qty: 399 },
       { srNo: 5, component: 'Remote Management System (RMS)', qty: 399 },
-      { srNo: 6, component: 'Filtration Works', qty: 39 },
-      { srNo: 7, component: 'Central Control Room', qty: 1 },
-      { srNo: 8, component: 'LORA Gateway', qty: 12 },
+      { srNo: 6, component: 'Primary Filtration Unit', qty: 33 },
+      { srNo: 7, component: 'Master Central Control Room', qty: 1 },
+      { srNo: 8, component: 'LORA Gateway', qty: 45 },
     ],
   },
 }
@@ -63,7 +63,7 @@ function defaultDetails(projectId: string, name: string, stateCode: string): Pro
     title: `${name} Project Summary`,
     client: '—',
     workOrderNo: '—',
-    contractValue: '—',
+    totalFlowRate: '—',
     contractor: '—',
     date: '—',
     totalCca: '—',

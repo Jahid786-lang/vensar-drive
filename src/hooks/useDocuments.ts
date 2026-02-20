@@ -38,7 +38,7 @@ export function useDocumentsSearch(query: string) {
   })
 }
 
-export function useCreateFolder(folderId: string | null) {
+export function useCreateFolder(folderId: string | null, projectPath?: string | null, serviceId?: string | null) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (name: string) =>
@@ -86,7 +86,13 @@ export function useDeleteFolder() {
 export function useUploadFile(folderId: string | null) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (file: File) => uploadFile(file, folderId),
+    mutationFn: ({
+      file,
+      onProgress,
+    }: {
+      file: File
+      onProgress?: (percent: number) => void
+    }) => uploadFile(file, folderId, onProgress),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
     },
