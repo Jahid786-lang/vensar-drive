@@ -3,7 +3,6 @@ import useMediaQuery from '@mui/material/useMediaQuery'
 import { useTheme } from '@mui/material/styles'
 import { DashboardTopBar } from './DashboardTopBar'
 import { DashboardSidebar } from './DashboardSidebar'
-import { DashboardFooter } from './DashboardFooter'
 import { SidebarProvider, useSidebar, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH, TOP_BAR_HEIGHT } from './SidebarContext'
 
 interface DashboardLayoutProps {
@@ -11,7 +10,7 @@ interface DashboardLayoutProps {
   title?: string
 }
 
-function DashboardLayoutInner({ children, title }: DashboardLayoutProps) {
+function DashboardLayoutInner({ children, title: _title }: DashboardLayoutProps) {
   const theme = useTheme()
   const isMobile = !useMediaQuery(theme.breakpoints.up('md'))
 

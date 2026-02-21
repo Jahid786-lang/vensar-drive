@@ -18,7 +18,7 @@ const item = {
 
 export function Logo() {
   const theme = useTheme()
-  const primary = theme.palette.primary as Record<string, string>
+  const primary = theme.palette.primary as unknown as Record<string, string>
   const main = theme.palette.primary.main
   const dark = theme.palette.primary.dark
   const alpha25 = primary.alpha25 ?? 'rgba(0,150,136,0.25)'

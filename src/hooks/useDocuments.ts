@@ -11,7 +11,6 @@ import {
   deleteFolder,
   deleteFolderRecursive,
   ensureProjectRootFolder,
-  type FlatFolder,
 } from '@/api/folders'
 import {
   uploadFile,

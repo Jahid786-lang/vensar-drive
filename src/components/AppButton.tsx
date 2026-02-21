@@ -5,7 +5,7 @@ import type { Theme } from '@mui/material/styles'
 import type { ButtonProps } from '@mui/material/Button'
 
 const primarySx = (theme: Theme) => {
-  const primary = theme.palette.primary as Record<string, string>
+  const primary = theme.palette.primary as unknown as Record<string, string>
   const shadow = primary.main ? `0 4px 14px ${primary.main}59` : undefined
   const shadowHover = primary.main ? `0 6px 20px ${primary.main}66` : undefined
   return {

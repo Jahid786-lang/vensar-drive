@@ -6,8 +6,6 @@ import type { UserRole } from '@/constants/roles'
 import BuildOutlined from '@mui/icons-material/BuildOutlined'
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined'
 import ScheduleOutlined from '@mui/icons-material/ScheduleOutlined'
-import PeopleOutlined from '@mui/icons-material/PeopleOutlined'
-import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined'
 import type { SvgIconComponent } from '@mui/icons-material'
 
 export interface SidebarNavItem {
@@ -27,7 +25,7 @@ export const sharedNavItems: SidebarNavItem[] = [
   { id: 'recent', label: 'Recent', icon: ScheduleOutlined, path: '/recent' },
 ]
 
-function baseMainItems(role: UserRole): SidebarNavItem[] {
+function baseMainItems(_role: UserRole): SidebarNavItem[] {
   const items: SidebarNavItem[] = [
     {
       id: 'services',
@@ -44,31 +42,7 @@ function baseMainItems(role: UserRole): SidebarNavItem[] {
     },
   ]
 
-  const servicesWithDropdown: SidebarNavItem = {
-    id: 'services',
-    label: 'Services',
-    icon: BuildOutlined,
-    path: '/',
-    pathPrefix: '/services',
-    children: [
-      { id: 'services-all', label: 'All Services', icon: BuildOutlined, path: '/' },
-      { id: 'services-create', label: 'Create Service', icon: AddCircleOutlined, path: '/services/create' },
-    ],
-  }
-  const usersWithDropdown: SidebarNavItem = {
-    id: 'users',
-    label: 'Users',
-    icon: PeopleOutlined,
-    path: '/users',
-    pathPrefix: '/users',
-    roles: ['super_admin', 'admin'],
-    children: [
-      { id: 'users-all', label: 'All Users', icon: PeopleOutlined, path: '/users' },
-      { id: 'users-create', label: 'Create User', icon: AddCircleOutlined, path: '/users/create' },
-    ],
-  }
-
-  // if (role === 'super_admin' || role === 'admin') {
+  // if (_role === 'super_admin' || _role === 'admin') {
   //   return [servicesWithDropdown, usersWithDropdown, items[1]]
   // }
 

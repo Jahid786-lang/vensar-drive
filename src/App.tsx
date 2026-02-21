@@ -15,7 +15,6 @@ import { CreateUserPage } from '@/pages/users/CreateUserPage'
 import { EditUserPage } from '@/pages/users/EditUserPage'
 import { ProfilePage } from '@/pages/profile/ProfilePage'
 import './App.css'
-import { FileExplorer } from './components/documnets/FileExplorer'
 import DocumentsPage from './pages/documents'
 
 function App() {

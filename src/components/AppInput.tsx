@@ -8,7 +8,7 @@ import type { Theme } from '@mui/material/styles'
 import type { TextFieldProps } from '@mui/material/TextField'
 
 const inputSx = (theme: Theme) => {
-  const primary = theme.palette.primary as Record<string, string>
+  const primary = theme.palette.primary as unknown as Record<string, string>
   return {
     '& .MuiFilledInput-root': {
       borderRadius: 2,

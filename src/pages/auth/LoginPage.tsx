@@ -417,7 +417,7 @@ export function LoginPage() {
                       className="login-card-subtitle"
                     >
                       We sent a 6-digit code to{" "}
-                      <strong>{pendingLogin?.email}</strong>
+                      <strong>{pendingLogin?.mobile}</strong>
                     </Typography>
                   </Box>
 

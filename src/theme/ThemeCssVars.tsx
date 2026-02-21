@@ -19,13 +19,13 @@ export function ThemeCssVars() {
       })
     }
 
-    setPaletteVars('primary', palette.primary as Record<string, string>)
-    setPaletteVars('secondary', palette.secondary as Record<string, string>)
-    setPaletteVars('error', palette.error as Record<string, string>)
-    setPaletteVars('warning', palette.warning as Record<string, string>)
-    setPaletteVars('info', palette.info as Record<string, string>)
-    setPaletteVars('success', palette.success as Record<string, string>)
-    setPaletteVars('grey', palette.grey as Record<string, string>)
+    setPaletteVars('primary', palette.primary as unknown as Record<string, string>)
+    setPaletteVars('secondary', palette.secondary as unknown as Record<string, string>)
+    setPaletteVars('error', palette.error as unknown as Record<string, string>)
+    setPaletteVars('warning', palette.warning as unknown as Record<string, string>)
+    setPaletteVars('info', palette.info as unknown as Record<string, string>)
+    setPaletteVars('success', palette.success as unknown as Record<string, string>)
+    setPaletteVars('grey', palette.grey as unknown as Record<string, string>)
 
     if (palette.background) {
       root.style.setProperty('--background-default', palette.background.default)
@@ -43,7 +43,7 @@ export function ThemeCssVars() {
     }
 
     // Convenience aliases for CSS (plain CSS files use these)
-    const primary = palette.primary as Record<string, string>
+    const primary = palette.primary as unknown as Record<string, string>
     if (primary?.main) {
       root.style.setProperty('--app-bg', palette.background?.default ?? primary[50] ?? '')
       root.style.setProperty('--accent', primary.main)
