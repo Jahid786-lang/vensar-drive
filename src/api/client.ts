@@ -6,14 +6,8 @@
  */
 
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
-import { API_BASE } from './config'
+import { API_BASE, REQUEST_TIMEOUT_MS } from './config'
 import { getDecryptedToken } from '@/lib/authStorage'
-
-// -----------------------------------------------------------------------------
-// Request defaults
-// -----------------------------------------------------------------------------
-
-const REQUEST_TIMEOUT_MS = 30_000
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE || undefined,

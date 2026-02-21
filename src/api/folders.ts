@@ -33,10 +33,12 @@ export async function fetchFolderTree(): Promise<FolderNode[]> {
   return buildFolderTree(flat)
 }
 
-/** Backend: new folder create. POST /folders { parentId?, name }. */
+/** Backend: new folder create. POST /folders { parentId?, name, serviceId?, projectId? }. */
 export async function createFolder(payload: {
   parentId?: string | null
   name: string
+  serviceId?: string | null
+  projectId?: string | null
 }): Promise<FlatFolder> {
   const data = await api.post<FlatFolder>(FOLDERS_ENDPOINT, payload)
   return data
@@ -51,7 +53,17 @@ export async function updateFolder(
   return data
 }
 
-/** Backend: delete folder. DELETE /folders/:id */
+/** Backend: delete folder (shallow). DELETE /folders/:id */
 export async function deleteFolder(id: string): Promise<void> {
   await api.delete(`${FOLDERS_ENDPOINT}/${id}`)
+}
+
+/** Backend: recursively delete folder + all children + files. DELETE /folders/:id/recursive */
+export async function deleteFolderRecursive(id: string): Promise<{ foldersDeleted: number; filesDeleted: number }> {
+  return api.delete<{ foldersDeleted: number; filesDeleted: number }>(`${FOLDERS_ENDPOINT}/${id}/recursive`)
+}
+
+/** Ensure project root folder exists. POST /folders/ensure-root */
+export async function ensureProjectRootFolder(serviceId: string, projectId: string): Promise<FlatFolder> {
+  return api.post<FlatFolder>(`${FOLDERS_ENDPOINT}/ensure-root`, { serviceId, projectId })
 }

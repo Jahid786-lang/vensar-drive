@@ -17,10 +17,10 @@ import ArrowDropDown from "@mui/icons-material/ArrowDropDown";
 import PersonAddOutlined from "@mui/icons-material/PersonAddOutlined";
 import AddCircleOutlined from "@mui/icons-material/AddCircleOutlined";
 import PeopleOutlined from "@mui/icons-material/PeopleOutlined";
-import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebar } from "./SidebarContext";
 import { isAdminOrAbove } from "@/constants/roles";
+import { APP_NAME } from "@/api/config";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 const navLinks = [
@@ -28,13 +28,13 @@ const navLinks = [
   { label: "Documents", path: "/documents" },
 ];
 
-const adminOnlyNavLinks = [{ label: "Events", path: "/events" }];
+// const adminOnlyNavLinks = [{ label: "Events", path: "/events" }];
 
 const configMenuItems = [
   { label: "Add User", path: "/users/create", icon: PersonAddOutlined },
   { label: "Add Service", path: "/services/create", icon: AddCircleOutlined },
   { label: "All Users", path: "/users", icon: PeopleOutlined },
-  { label: "Admin", path: "/admin", icon: SettingsOutlined },
+  // { label: "Admin", path: "/admin", icon: SettingsOutlined },
 ];
 
 function isLinkActive(path: string, pathname: string): boolean {
@@ -112,7 +112,7 @@ export function DashboardTopBar() {
               },
             }}
           >
-            OneDrive
+            {APP_NAME}
           </Typography>
         </Box>
 

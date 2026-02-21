@@ -16,10 +16,8 @@ export interface ProjectDetailsData {
   workOrderNo: string
   totalFlowRate: string
   contractor: string
-  date: string
   totalCca: string
   workScope: string
-  paymentTerms: string[]
   majorComponents: MajorComponent[]
 }
 
@@ -33,20 +31,12 @@ const detailsStore: Record<string, ProjectDetailsData> = {
     workOrderNo: 'EI557WOD0000035',
     totalFlowRate: '133203.31',
     contractor: 'VENSAR MP JV',
-    date: '15 Jan 2025',
     totalCca: '1,12,124.00 HA',
     workScope: `Design, supply, erection, testing and commissioning of distribution management and pump house automation (PLC & SCADA, instruments) including the filtration systems and control management. Scope covers pumping station, DC, primary filtration, OMS, RMS, LORA gateway and master central control room.`,
-    paymentTerms: [
-      '5% after detailed design approval',
-      '70% after receipt of material at site',
-      '20% after erection and commissioning',
-      '5% after clearance of final punch list',
-    ],
     majorComponents: [
       { srNo: 1, component: 'Number of Pumping Station', qty: 2 },
       { srNo: 2, component: 'Delivery Chamber (DC)', qty: 1 },
       { srNo: 3, component: 'Outlet Management System (OMS)', qty: 3841 },
-      // { srNo: 4, component: 'Air Management System (AMS)', qty: 399 },
       { srNo: 5, component: 'Remote Management System (RMS)', qty: 399 },
       { srNo: 6, component: 'Primary Filtration Unit', qty: 33 },
       { srNo: 7, component: 'Master Central Control Room', qty: 1 },
@@ -65,10 +55,8 @@ function defaultDetails(projectId: string, name: string, stateCode: string): Pro
     workOrderNo: '—',
     totalFlowRate: '—',
     contractor: '—',
-    date: '—',
     totalCca: '—',
     workScope: 'Details will be updated from backend.',
-    paymentTerms: [],
     majorComponents: [],
   }
 }

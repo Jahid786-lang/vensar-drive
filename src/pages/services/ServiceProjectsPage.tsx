@@ -18,16 +18,18 @@ import InfoOutlined from '@mui/icons-material/InfoOutlined'
 import ArrowForward from '@mui/icons-material/ArrowForward'
 import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined'
 import { motion } from 'framer-motion'
-import { useAppSelector } from '@/store/hooks'
-import { selectServicesList } from '@/store/servicesSlice'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { useService } from '@/hooks/useServices'
 import { isAdminOrAbove } from '@/constants/roles'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import {
-  getProjectsByServiceId,
-  getProjectDisplayName,
-  type ServiceProject,
-} from '@/data/serviceProjects'
+import { useProjects, useSeedIrrigationProject } from '@/hooks/useProjects'
+import { useStates } from '@/hooks/useStates'
+import type { ProjectItem } from '@/api/projectsApi'
+
+function getProjectDisplayName(p: ProjectItem): string {
+  return p.shortName ?? p.name
+}
 
 const glassPanel = {
   bgcolor: 'rgba(255, 255, 255, 0.72)',
@@ -51,7 +53,7 @@ function ProjectCard({
   onClick,
   isDefault,
 }: {
-  project: ServiceProject
+  project: ProjectItem
   index: number
   onClick: () => void
   isDefault?: boolean
@@ -199,20 +201,20 @@ export function ServiceProjectsPage() {
   const { serviceId } = useParams<{ serviceId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { showToast } = useToast()
   const [search, setSearch] = useState('')
   const [stateFilter, setStateFilter] = useState<string>('')
   const showCreateProject = isAdminOrAbove(user?.role)
 
-  const servicesList = useAppSelector(selectServicesList)
-  const service = serviceId
-    ? servicesList.find((s) => s.id === serviceId)
-    : null
-  const allProjects = serviceId ? getProjectsByServiceId(serviceId) : []
+  const { data: service, isLoading: serviceLoading, error: serviceError } = useService(serviceId)
+  const { data: allProjects = [], isLoading: projectsLoading } = useProjects(serviceId)
+  const { data: statesList = [] } = useStates()
+  const seedIrrigation = useSeedIrrigationProject()
 
-  const states = useMemo(() => {
-    const set = new Set(allProjects.map((p) => p.stateCode))
-    return Array.from(set).sort()
-  }, [allProjects])
+  const states = useMemo(
+    () => [...statesList].sort((a, b) => a.name.localeCompare(b.name)),
+    [statesList],
+  )
 
   const filteredProjects = useMemo(() => {
     let list = allProjects
@@ -230,11 +232,41 @@ export function ServiceProjectsPage() {
     return list
   }, [allProjects, search, stateFilter])
 
-  const defaultProjectId = serviceId === 'irrigation' ? 'kayampur-sitamau' : null
+  const isLoading = serviceLoading || projectsLoading
+
+  const defaultProjectId =
+    serviceId === 'irrigation' && allProjects.some((p) => p.projectId === 'kayampur-sitamau')
+      ? 'kayampur-sitamau'
+      : null
 
   if (!serviceId) {
-    navigate('/services', { replace: true })
+    navigate('/', { replace: true })
     return null
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <Typography color="text.secondary">Loading...</Typography>
+        </Box>
+      </DashboardLayout>
+    )
+  }
+
+  if (serviceError || !service) {
+    return (
+      <DashboardLayout>
+        <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Typography color="error" sx={{ mb: 2 }}>
+            {serviceError instanceof Error ? serviceError.message : 'Service not found'}
+          </Typography>
+          <Button variant="outlined" onClick={() => navigate('/')}>
+            Back to Services
+          </Button>
+        </Box>
+      </DashboardLayout>
+    )
   }
 
   return (
@@ -281,7 +313,7 @@ export function ServiceProjectsPage() {
             >
               <Box
                 component="button"
-                onClick={() => navigate('/services')}
+                onClick={() => navigate('/')}
                 sx={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -308,7 +340,7 @@ export function ServiceProjectsPage() {
                   component="span"
                   color="text.secondary"
                   sx={{ '&:hover': { color: 'primary.main' }, cursor: 'pointer' }}
-                  onClick={() => navigate('/services')}
+                  onClick={() => navigate('/')}
                 >
                   Services
                 </Typography>
@@ -316,7 +348,7 @@ export function ServiceProjectsPage() {
                   /
                 </Typography>
                 <Typography variant="body2" fontWeight={600} color="primary.dark">
-                  {service?.label ?? serviceId}
+                  {service?.serviceName ?? serviceId}
                 </Typography>
               </Box>
               <Typography
@@ -334,6 +366,35 @@ export function ServiceProjectsPage() {
             </Box>
 
             <Box sx={{ p: { xs: 2, sm: 3 }, pb: { xs: 3, sm: 4 } }}>
+              {serviceId === 'irrigation' &&
+                showCreateProject &&
+                allProjects.length === 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={async () => {
+                        try {
+                          const res = await seedIrrigation.mutateAsync()
+                          showToast(
+                            res.seeded > 0
+                              ? 'Sample project (Kayampur Sitamau) seeded'
+                              : 'Sample project already exists',
+                            res.seeded > 0 ? 'success' : 'info',
+                          )
+                        } catch (err) {
+                          showToast(
+                            err instanceof Error ? err.message : 'Seed failed',
+                            'error',
+                          )
+                        }
+                      }}
+                      disabled={seedIrrigation.isPending}
+                    >
+                      {seedIrrigation.isPending ? 'Seeding...' : 'Seed sample project'}
+                    </Button>
+                  </Box>
+                )}
               {allProjects.length > 0 && (
                 <Box
                   sx={{
@@ -399,8 +460,8 @@ export function ServiceProjectsPage() {
                     >
                       <MenuItem value="">All states</MenuItem>
                       {states.map((st) => (
-                        <MenuItem key={st} value={st}>
-                          {st}
+                        <MenuItem key={st.code} value={st.code}>
+                          {st.name} ({st.code})
                         </MenuItem>
                       ))}
                     </Select>
@@ -454,11 +515,11 @@ export function ServiceProjectsPage() {
                 >
                   {filteredProjects.map((project, index) => (
                     <ProjectCard
-                      key={project.id}
+                      key={project.projectId}
                       project={project}
                       index={index}
-                      isDefault={project.id === defaultProjectId}
-                      onClick={() => navigate(`/services/${serviceId}/projects/${project.id}`)}
+                      isDefault={project.projectId === defaultProjectId}
+                      onClick={() => navigate(`/services/${serviceId}/projects/${project.projectId}`)}
                     />
                   ))}
                 </Box>

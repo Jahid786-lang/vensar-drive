@@ -10,46 +10,59 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
+import Button from '@mui/material/Button'
 import ArrowBack from '@mui/icons-material/ArrowBack'
 import { useState } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { getProjectsByServiceId } from '@/data/serviceProjects'
-import { getProjectDetails, type ProjectDetailsData } from '@/data/projectDetails'
+import { useProject } from '@/hooks/useProjects'
 import { FileExplorer } from '@/components/documnets/FileExplorer'
 
-const TAB_LABELS = [
-  'Project Details',
-  // 'Execution Summary',
-  // 'Erection & Commissioning',
-  // 'SCADA Monitoring',
-  'Documents',
-]
+const TAB_LABELS = ['Project Details', 'Documents']
 
 export function ProjectDetailsPage() {
   const { serviceId, projectId } = useParams<{ serviceId: string; projectId: string }>()
   const navigate = useNavigate()
   const [tab, setTab] = useState(0)
 
-  const projects = serviceId ? getProjectsByServiceId(serviceId) : []
-  const project = projectId ? projects.find((p) => p.id === projectId) : null
-  const details: ProjectDetailsData | null =
-    serviceId && projectId && project
-      ? getProjectDetails(serviceId, projectId, project.name, project.stateCode)
-      : null
+  const { data: project, isLoading, error } = useProject(serviceId, projectId)
 
   if (!serviceId || !projectId) {
-    navigate('/services', { replace: true })
+    navigate('/', { replace: true })
     return null
   }
-  if (!details) {
-    navigate(`/services/${serviceId}`, { replace: true })
-    return null
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <Typography color="text.secondary">Loading project...</Typography>
+        </Box>
+      </DashboardLayout>
+    )
+  }
+
+  if (error || !project) {
+    return (
+      <DashboardLayout>
+        <Box sx={{ p: 2, textAlign: 'center' }}>
+          <Typography color="error" sx={{ mb: 2 }}>
+            {error instanceof Error ? error.message : 'Project not found'}
+          </Typography>
+          <Button variant="outlined" onClick={() => navigate(`/services/${serviceId}`)}>
+            Back to Projects
+          </Button>
+        </Box>
+      </DashboardLayout>
+    )
   }
 
   const highlightSx = {
     fontWeight: 600,
     color: 'primary.dark',
   }
+
+  const customFields = project.customFields ?? []
+  const majorComponents = project.majorComponents ?? []
 
   return (
     <DashboardLayout>
@@ -71,7 +84,6 @@ export function ProjectDetailsPage() {
             flex: 1,
             minWidth: 0,
             overflow: 'hidden',
-            // borderRadius: 3,
             bgcolor: 'background.paper',
             border: '1px solid',
             borderColor: 'divider',
@@ -119,7 +131,7 @@ export function ProjectDetailsPage() {
                 wordBreak: 'break-word',
               }}
             >
-              {details.name}
+              {project.name}
             </Typography>
           </Box>
 
@@ -160,93 +172,44 @@ export function ProjectDetailsPage() {
                     mb: 3,
                   }}
                 >
-                  <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Client
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {details.client}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Contractor
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {details.contractor}
-                    </Typography>
-                  </Box>
-                  {/* <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Work Order No
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {details.workOrderNo}
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Date
-                    </Typography>
-                    <Typography variant="body1" sx={highlightSx}>
-                      {details.date}
-                    </Typography>
-                  </Box> */}
-                  <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Total Flow Rate
-                    </Typography>
-                    <Typography variant="body1" sx={highlightSx}>
-                      {details.totalFlowRate} m³/h
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      Total CCA
-                    </Typography>
-                    <Typography variant="body1" sx={highlightSx}>
-                      {details.totalCca}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Box
-                  sx={{
-                    // display: 'grid',
-                    // gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-                    // gap: 2,
-                    mb: 3,
-                  }}
-                >
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                      Work Scope
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-                      {details.workScope}
-                    </Typography>
-                  </Paper>
-                  {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                      Payment Terms
-                    </Typography>
-                    {details.paymentTerms.length > 0 ? (
-                      <Box component="ul" sx={{ m: 0, pl: 2, '& li': { mb: 0.5 } }}>
-                        {details.paymentTerms.map((term, i) => (
-                          <Typography key={i} component="li" variant="body2" color="text.secondary">
-                            {term}
-                          </Typography>
-                        ))}
-                      </Box>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        —
+                  {customFields.map((f, i) => (
+                    <Box key={i}>
+                      <Typography
+                        variant="overline"
+                        color="text.secondary"
+                        sx={{ fontSize: '0.7rem' }}
+                      >
+                        {f.label}
                       </Typography>
-                    )}
-                  </Paper> */}
+                      <Typography
+                        variant="body1"
+                        sx={f.label.toLowerCase().includes('flow') || f.label.toLowerCase().includes('cca') ? highlightSx : { fontWeight: 600 }}
+                      >
+                        {f.value || '—'}
+                        {f.label.toLowerCase().includes('flow rate') && f.value ? ' m³/h' : ''}
+                      </Typography>
+                    </Box>
+                  ))}
                 </Box>
 
-                {details.majorComponents.length > 0 && (
+                {project.workScope && (
+                  <Box sx={{ mb: 3 }}>
+                    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+                      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                        Work Scope
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ lineHeight: 1.6 }}
+                      >
+                        {project.workScope}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                )}
+
+                {majorComponents.length > 0 && (
                   <>
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                       Major Components
@@ -258,7 +221,7 @@ export function ProjectDetailsPage() {
                     >
                       <Table size="small" sx={{ minWidth: 280 }}>
                         <TableHead>
-                          <TableRow sx={{ bgcolor: 'action.hover', }}>
+                          <TableRow sx={{ bgcolor: 'action.hover' }}>
                             <TableCell sx={{ fontWeight: 600 }}>Sr No</TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>Component</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 600 }}>
@@ -267,9 +230,9 @@ export function ProjectDetailsPage() {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {details.majorComponents.map((row, i) => (
+                          {majorComponents.map((row, i) => (
                             <TableRow
-                              key={row.srNo}
+                              key={i}
                               sx={{
                                 bgcolor: i % 2 === 0 ? 'background.paper' : 'action.hover',
                               }}
@@ -284,6 +247,12 @@ export function ProjectDetailsPage() {
                     </TableContainer>
                   </>
                 )}
+
+                {customFields.length === 0 && !project.workScope && majorComponents.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    No details added yet.
+                  </Typography>
+                )}
               </>
             )}
             {tab === 1 && (
@@ -291,18 +260,11 @@ export function ProjectDetailsPage() {
                 key={`${serviceId}-${projectId}`}
                 projectPath={`/${serviceId}/${projectId}`}
                 serviceId={serviceId}
+                projectId={projectId}
               />
-            )}
-            {tab > 1 && (
-              <Box sx={{ py: 4, textAlign: 'center' }}>
-                <Typography color="text.secondary">
-                  {TAB_LABELS[tab]} — Coming soon
-                </Typography>
-              </Box>
             )}
           </Box>
         </Paper>
-
       </Box>
     </DashboardLayout>
   )

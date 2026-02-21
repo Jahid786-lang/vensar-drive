@@ -36,16 +36,16 @@ export interface DocumentsSearchResponse {
 
 export async function fetchDocuments(
   folderId: string | null,
-  /** Path for project view: /serviceId/projectId e.g. /irrigation/kayampur-sitamau */
   projectPath?: string | null,
-  /** Service ID for validation - ensures folder belongs to this service */
   serviceId?: string | null,
+  projectId?: string | null,
 ): Promise<DocumentsListResponse> {
-  const id = !folderId || folderId === 'root' ? 'root' : folderId
+  const id = !folderId || folderId === 'root' ? null : folderId
   const params = new URLSearchParams()
-  if (id !== 'root') params.set('folderId', id)
-  if (projectPath) params.set('path', projectPath)
+  if (id) params.set('folderId', id)
   if (serviceId) params.set('serviceId', serviceId)
+  if (projectId) params.set('projectId', projectId)
+  if (projectPath && !projectId) params.set('path', projectPath)
   const qs = params.toString()
   const data = await api.get<DocumentsListResponse>(
     `/documents${qs ? `?${qs}` : ''}`,
@@ -57,10 +57,15 @@ export async function fetchDocuments(
   }
 }
 
-export async function searchDocuments(q: string): Promise<DocumentsSearchResponse> {
-  const data = await api.get<DocumentsSearchResponse>(
-    `/documents/search?q=${encodeURIComponent(q)}`,
-  )
+export async function searchDocuments(
+  q: string,
+  serviceId?: string | null,
+  projectId?: string | null,
+): Promise<DocumentsSearchResponse> {
+  const params = new URLSearchParams({ q })
+  if (serviceId) params.set('serviceId', serviceId)
+  if (projectId) params.set('projectId', projectId)
+  const data = await api.get<DocumentsSearchResponse>(`/documents/search?${params.toString()}`)
   return {
     folders: data.folders ?? [],
     files: data.files ?? [],

@@ -22,6 +22,7 @@ import {
   SIDEBAR_COLLAPSED_WIDTH,
   TOP_BAR_HEIGHT,
 } from "./SidebarContext";
+import { NavSubTree } from "./NavPathTree";
 
 function isItemActive(item: SidebarNavItem, pathname: string): boolean {
   if (item.pathPrefix) return pathname === item.path || pathname.startsWith(item.pathPrefix);
@@ -180,31 +181,33 @@ export function DashboardSidebar() {
 
             const navPath = item.path ?? "/";
             return (
-              <ListItemButton
-                key={item.id}
-                selected={isSelected}
-                onClick={() => handleNav(navPath)}
-                sx={{
-                  borderRadius: 0.5,
-                  my: 0.6,
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  px: collapsed ? 1 : 1.5,
-                  borderLeft: isSelected ? "3px solid" : "3px solid transparent",
-                  borderColor: isSelected ? "primary.main" : "grey.400",
-                  bgcolor: isSelected ? "primary.main" : "transparent",
-                  color: isSelected ? "primary.main" : "text.primary",
-                  "&:hover": { bgcolor: isSelected ? "primary.dark" : "action.hover" },
-                  "& .MuiListItemIcon-root": { minWidth: collapsed ? 0 : 36 },
-                  p: 0.2,
-                }}
-              >
-                <ListItemIcon sx={{ color: isSelected ? "primary.main" : "text.secondary" }}>
-                  <Icon fontSize="small" />
-                </ListItemIcon>
-                {!collapsed && (
-                  <ListItemText primary={item.label} slotProps={{ primary: { fontSize: "0.9rem" } }} />
-                )}
-              </ListItemButton>
+              <Box key={item.id}>
+                <ListItemButton
+                  selected={isSelected}
+                  onClick={() => handleNav(navPath)}
+                  sx={{
+                    borderRadius: 0.5,
+                    my: 0.6,
+                    justifyContent: collapsed ? "center" : "flex-start",
+                    px: collapsed ? 1 : 1.5,
+                    borderLeft: isSelected ? "3px solid" : "3px solid transparent",
+                    borderColor: isSelected ? "primary.main" : "grey.400",
+                    bgcolor: isSelected ? "primary.main" : "transparent",
+                    color: isSelected ? "primary.main" : "text.primary",
+                    "&:hover": { bgcolor: isSelected ? "primary.dark" : "action.hover" },
+                    "& .MuiListItemIcon-root": { minWidth: collapsed ? 0 : 36 },
+                    p: 0.2,
+                  }}
+                >
+                  <ListItemIcon sx={{ color: isSelected ? "primary.main" : "text.secondary" }}>
+                    <Icon fontSize="small" />
+                  </ListItemIcon>
+                  {!collapsed && (
+                    <ListItemText primary={item.label} slotProps={{ primary: { fontSize: "0.9rem" } }} />
+                  )}
+                </ListItemButton>
+                {!collapsed && <NavSubTree itemId={item.id} />}
+              </Box>
             );
           })}
       </List>

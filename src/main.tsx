@@ -10,6 +10,7 @@ import { queryClient } from '@/lib/queryClient'
 import { appTheme } from '@/theme/appTheme'
 import { ThemeCssVars } from '@/theme/ThemeCssVars'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { NavigationProvider } from '@/contexts/NavigationContext'
 import './index.css'
 import App from './App.tsx'
 
@@ -21,7 +22,9 @@ createRoot(document.getElementById('root')!).render(
           <ThemeCssVars />
           <CssBaseline />
           <ToastProvider>
-            <App />
+            <NavigationProvider>
+              <App />
+            </NavigationProvider>
           </ToastProvider>
         </ThemeProvider>
         {/* {import.meta.env.DEV && <ReactQueryDevtools buttonPosition="bottom-right" />} */}

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
@@ -37,17 +37,127 @@ import {
   useRenameFile,
   useDeleteFile,
   useDeleteFolder,
+  useDeleteFolderRecursive,
   useUpdateFolder,
   useDownloadFile,
 } from '@/hooks/useDocuments'
+import { createFolder } from '@/api/folders'
 import { useFoldersFlat } from '@/hooks/useFoldersFlat'
 import { useToast } from '@/contexts/ToastContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useNavigation } from '@/contexts/NavigationContext'
 import { isAdminOrAbove } from '@/constants/roles'
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { RenameDialog } from './RenameDialog'
 import type { DocumentFolder, DocumentFile } from '@/api/documentsApi'
+
+const IMAGE_MIME_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/jpg', 'image/gif',
+  'image/webp', 'image/svg+xml', 'image/bmp',
+])
+
+function isImageFile(mimeType: string): boolean {
+  return IMAGE_MIME_TYPES.has(mimeType)
+}
+
+/** In-memory cache: fileId → { url, expiresAt } */
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
+
+/**
+ * Image thumbnail:
+ * 1. Try /view-url endpoint → get presigned S3 URL (fast, no backend proxy).
+ *    Caches the URL for VITE_SIGNED_URL_CACHE_MS milliseconds.
+ * 2. If no S3 URL (local file) → fetch with auth and create blob URL.
+ */
+function ImageThumbnail({ fileId, alt }: { fileId: string; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    let blobUrl: string | null = null
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        // Check cache first
+        const cached = signedUrlCache.get(fileId)
+        if (cached && cached.expiresAt > Date.now()) {
+          if (!cancelled) setSrc(cached.url)
+          return
+        }
+
+        // Step 1: try presigned S3 URL
+        const { getFileViewUrl } = await import('@/api/filesApi')
+        const { SIGNED_URL_CACHE_MS } = await import('@/api/config')
+        const result = await getFileViewUrl(fileId)
+        if (result.url && !cancelled) {
+          signedUrlCache.set(fileId, {
+            url: result.url,
+            expiresAt: Date.now() + SIGNED_URL_CACHE_MS,
+          })
+          setSrc(result.url)
+          return
+        }
+      } catch {
+        // fallthrough to blob fetch
+      }
+
+      // Step 2: fallback – fetch with auth, create blob URL (local storage)
+      try {
+        const { getDecryptedToken } = await import('@/lib/authStorage')
+        const { API_BASE } = await import('@/api/config')
+        const token = getDecryptedToken()
+        const res = await fetch(`${API_BASE}/files/${fileId}/download`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          redirect: 'follow',
+        })
+        if (!res.ok || cancelled) { setError(true); return }
+        const blob = await res.blob()
+        blobUrl = URL.createObjectURL(blob)
+        if (!cancelled) setSrc(blobUrl)
+      } catch {
+        if (!cancelled) setError(true)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+    }
+  }, [fileId])
+
+  if (error || (!src)) {
+    return (
+      <Box
+        sx={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: 'grey.100',
+        }}
+      >
+        <ImageOutlined sx={{ fontSize: 28, color: error ? 'error.light' : 'grey.400' }} />
+      </Box>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        display: 'block',
+      }}
+      onError={() => setError(true)}
+    />
+  )
+}
 
 const FILE_ICONS: Record<string, React.ReactNode> = {
   'application/pdf': <PictureAsPdfOutlined sx={{ color: 'error.dark' }} />,
@@ -83,6 +193,8 @@ export interface FileExplorerProps {
   projectPath?: string | null
   /** Service ID - ensures documents are scoped to this service only */
   serviceId?: string | null
+  /** Project ID - scopes documents to this project */
+  projectId?: string | null
 }
 
 function formatDate(iso?: string): string {
@@ -114,7 +226,7 @@ function formatDateDisplay(iso?: string): string {
 
 type ViewMode = 'list' | 'grid'
 
-export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {}) {
+export function FileExplorer({ projectPath, serviceId, projectId: propProjectId }: FileExplorerProps = {}) {
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchQuery, setSearchQuery] = useState('')
@@ -128,29 +240,59 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
   const [renameItem, setRenameItem] = useState<DocumentFolder | DocumentFile | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<DocumentFolder | DocumentFile | null>(null)
-  const [uploadProgress, setUploadProgress] = useState<{ percent: number; currentFile?: string } | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<{ percent: number; currentFile?: string; total?: number; done?: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const { showToast } = useToast()
   const { user } = useAuth()
+  const { setDocFolderPath } = useNavigation()
+
+  // Extract projectId from projectPath if not provided directly (/serviceId/projectId)
+  const projectId = propProjectId ?? (projectPath ? projectPath.split('/').filter(Boolean)[1] ?? null : null)
 
   /** Upload/create only in project documents, and only for admin/super_admin */
   const canUpload = !!projectPath && isAdminOrAbove(user?.role)
-  console.log("currentFolderId>>>", currentFolderId)
-  const { data, isLoading, error } = useDocuments(currentFolderId, projectPath, serviceId)
+  const { data, isLoading, error } = useDocuments(currentFolderId, projectPath, serviceId, projectId)
   const { data: foldersFlat } = useFoldersFlat()
-  const createFolder = useCreateFolder(currentFolderId, projectPath, serviceId)
-  const uploadFile = useUploadFile(currentFolderId)
+  const createFolderMutation = useCreateFolder(serviceId, projectId)
+  const uploadFileMutation = useUploadFile(serviceId, projectId)
   const renameFile = useRenameFile()
   const renameFolder = useUpdateFolder()
   const deleteFileMutation = useDeleteFile()
   const deleteFolderMutation = useDeleteFolder()
+  const deleteFolderRecursiveMutation = useDeleteFolderRecursive()
   const downloadFileMutation = useDownloadFile()
 
   const folders = data?.folders ?? []
   const files = data?.files ?? []
   const rootFolder = data?.rootFolder ?? null
+
+  /**
+   * Effective parent folder ID for create/upload operations.
+   * When at project root (currentFolderId=null), use rootFolder.id so files
+   * land inside the project, not at system root.
+   */
+  const effectiveFolderId = currentFolderId ?? rootFolder?.id ?? null
+
+  // Sync folder path to NavigationContext (only for My Documents, not project docs)
+  useEffect(() => {
+    if (!projectPath && foldersFlat) {
+      if (!currentFolderId) {
+        setDocFolderPath([])
+        return
+      }
+      const map = new Map(foldersFlat.map((f) => [f.id, f]))
+      const chain: { id: string; name: string }[] = []
+      let curr = map.get(currentFolderId)
+      while (curr) {
+        chain.unshift({ id: curr.id, name: curr.name })
+        curr = curr.parentId ? map.get(curr.parentId) : undefined
+      }
+      setDocFolderPath(chain)
+    }
+  }, [currentFolderId, foldersFlat, projectPath, setDocFolderPath])
 
   const breadcrumb = (() => {
     if (!currentFolderId) {
@@ -174,7 +316,7 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
   })()
 
   const handleCreateFolder = async (name: string) => {
-    await createFolder.mutateAsync(name)
+    await createFolderMutation.mutateAsync({ name, parentId: effectiveFolderId })
     showToast('Folder created', 'success')
   }
 
@@ -183,28 +325,39 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
     fileInputRef.current?.click()
   }
 
+  const handleFolderUpload = () => {
+    if (!canUpload) return
+    folderInputRef.current?.click()
+  }
+
+  /**
+   * Upload flat list of files (no folder structure).
+   */
   const processFiles = useCallback(
-    async (fileList: FileList | File[]) => {
+    async (fileList: FileList | File[], targetFolderId: string | null) => {
       const files = Array.from(fileList)
       if (!files.length || !canUpload) return
-      setUploadProgress({ percent: 0, currentFile: files[0]?.name })
+      setUploadProgress({ percent: 0, currentFile: files[0]?.name, total: files.length, done: 0 })
       try {
         for (let i = 0; i < files.length; i++) {
           const file = files[i]!
           setUploadProgress({
             percent: Math.round((i / files.length) * 100),
             currentFile: file.name,
+            total: files.length,
+            done: i,
           })
-          await uploadFile.mutateAsync({
+          await uploadFileMutation.mutateAsync({
             file,
+            folderId: targetFolderId,
             onProgress: (p) => {
               const base = (i / files.length) * 100
               const contribution = (p / 100) * (1 / files.length) * 100
-              setUploadProgress({ percent: Math.round(base + contribution), currentFile: file.name })
+              setUploadProgress({ percent: Math.round(base + contribution), currentFile: file.name, total: files.length, done: i })
             },
           })
         }
-        setUploadProgress({ percent: 100, currentFile: files[files.length - 1]?.name })
+        setUploadProgress({ percent: 100, currentFile: files[files.length - 1]?.name, total: files.length, done: files.length })
         showToast(`${files.length} file(s) uploaded`, 'success')
       } catch (err) {
         showToast(err instanceof Error ? err.message : 'Upload failed', 'error')
@@ -212,13 +365,112 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         setTimeout(() => setUploadProgress(null), 800)
       }
     },
-    [canUpload, uploadFile, showToast],
+    [canUpload, uploadFileMutation, showToast],
+  )
+
+  /**
+   * Upload a folder with its full structure.
+   * Uses webkitRelativePath to reconstruct nested folders.
+   */
+  const processFolderUpload = useCallback(
+    async (fileList: FileList, uploadRootFolderId: string | null) => {
+      if (!fileList.length || !canUpload) return
+      const files = Array.from(fileList)
+      if (!files.length) return
+
+      // Map of relative directory path -> folderId
+      const folderIdMap = new Map<string, string>()
+      const rootFolderId = uploadRootFolderId
+
+      setUploadProgress({ percent: 0, currentFile: 'Creating folder structure...', total: files.length, done: 0 })
+
+      try {
+        // Sort so parents come before children
+        files.sort((a, b) => {
+          const pa = (a.webkitRelativePath || a.name).split('/').length
+          const pb = (b.webkitRelativePath || b.name).split('/').length
+          return pa - pb
+        })
+
+        // First pass: create all needed folders
+        const dirsSeen = new Set<string>()
+        for (const file of files) {
+          const relPath = file.webkitRelativePath || file.name
+          const parts = relPath.split('/')
+          // parts = ['FolderName', 'SubFolder', 'file.pdf']
+          // We need to create folder for each directory segment
+          for (let depth = 1; depth < parts.length; depth++) {
+            const dirPath = parts.slice(0, depth).join('/')
+            if (dirsSeen.has(dirPath)) continue
+            dirsSeen.add(dirPath)
+
+            const parentDirPath = depth === 1 ? '' : parts.slice(0, depth - 1).join('/')
+            const parentId = parentDirPath ? (folderIdMap.get(parentDirPath) ?? rootFolderId) : rootFolderId
+            const folderName = parts[depth - 1]!
+
+            try {
+              const newFolder = await createFolder({
+                name: folderName,
+                parentId: parentId,
+                serviceId: serviceId || null,
+                projectId: projectId || null,
+              })
+              folderIdMap.set(dirPath, newFolder.id)
+            } catch {
+              // Folder may already exist, try to find it from existing data
+              const existingId = folderIdMap.get(dirPath)
+              if (!existingId) {
+                // Use parentId as fallback
+                folderIdMap.set(dirPath, parentId ?? 'root')
+              }
+            }
+          }
+        }
+
+        // Second pass: upload files into correct folders
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]!
+          const relPath = file.webkitRelativePath || file.name
+          const parts = relPath.split('/')
+          const dirPath = parts.slice(0, parts.length - 1).join('/')
+          const targetFolderId = dirPath ? (folderIdMap.get(dirPath) ?? rootFolderId) : rootFolderId
+
+          setUploadProgress({
+            percent: Math.round(((i + 1) / files.length) * 100),
+            currentFile: file.name,
+            total: files.length,
+            done: i + 1,
+          })
+
+          await uploadFileMutation.mutateAsync({
+            file,
+            folderId: targetFolderId ?? null,
+            onProgress: undefined,
+          })
+        }
+
+        setUploadProgress({ percent: 100, total: files.length, done: files.length })
+        showToast(`Folder uploaded: ${files.length} file(s)`, 'success')
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : 'Folder upload failed', 'error')
+      } finally {
+        setTimeout(() => setUploadProgress(null), 800)
+      }
+    },
+    [canUpload, uploadFileMutation, serviceId, projectId, showToast],
   )
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
     if (!selected?.length) return
-    await processFiles(selected)
+    await processFiles(selected, effectiveFolderId)
+    e.target.value = ''
+  }
+
+  const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files
+    if (!selected?.length) return
+    await processFolderUpload(selected, effectiveFolderId)
     e.target.value = ''
   }
 
@@ -244,11 +496,23 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
       e.preventDefault()
       e.stopPropagation()
       setIsDragging(false)
+
+      // Check if any items are directories (folder drop)
+      const items = Array.from(e.dataTransfer.items ?? [])
+      const hasDirectory = items.some(
+        (item) => item.kind === 'file' && item.webkitGetAsEntry?.()?.isDirectory,
+      )
+
+      if (hasDirectory) {
+        showToast('Folder drop not supported in all browsers. Use "Upload Folder" button.', 'info')
+        return
+      }
+
       const files = e.dataTransfer.files
       if (!files?.length) return
-      await processFiles(files)
+      await processFiles(files, effectiveFolderId)
     },
-    [canUpload, processFiles],
+    [canUpload, processFiles, showToast, effectiveFolderId],
   )
 
   const handleRename = async (newName: string) => {
@@ -269,8 +533,19 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         await deleteFileMutation.mutateAsync(deleteItem.id)
         showToast('File deleted', 'success')
       } else {
-        await deleteFolderMutation.mutateAsync(deleteItem.id)
-        showToast('Folder deleted', 'success')
+        const folder = deleteItem as DocumentFolder
+        const hasChildren = (folder.childrenCount ?? 0) > 0
+        if (hasChildren) {
+          // Recursive delete
+          const result = await deleteFolderRecursiveMutation.mutateAsync(deleteItem.id)
+          showToast(`Deleted ${result.foldersDeleted} folder(s) and ${result.filesDeleted} file(s)`, 'success')
+        } else {
+          await deleteFolderMutation.mutateAsync(deleteItem.id)
+          showToast('Folder deleted', 'success')
+        }
+        if (currentFolderId === deleteItem.id) {
+          setCurrentFolderId(null)
+        }
       }
       setDeleteOpen(false)
       setDeleteItem(null)
@@ -351,6 +626,15 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         multiple
         style={{ display: 'none' }}
         onChange={handleFileSelect}
+      />
+      <input
+        ref={folderInputRef}
+        type="file"
+        style={{ display: 'none' }}
+        // @ts-expect-error – webkitdirectory is not in TS types yet
+        webkitdirectory=""
+        multiple
+        onChange={handleFolderSelect}
       />
 
       <Box
@@ -469,6 +753,22 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
                 >
                   New Folder
                 </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setNewMenuAnchor(null)
+                    handleFolderUpload()
+                  }}
+                >
+                  Upload Folder
+                </MenuItem>
+                <MenuItem
+                  onClick={() => {
+                    setNewMenuAnchor(null)
+                    handleUpload()
+                  }}
+                >
+                  Upload Files
+                </MenuItem>
               </Menu>
               <Button
                 variant="contained"
@@ -565,11 +865,13 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
             <CloudUploadOutlined color="primary" />
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Uploading{uploadProgress.currentFile ? `: ${uploadProgress.currentFile}` : ''}
+              <Typography variant="body2" fontWeight={600} noWrap>
+                {uploadProgress.currentFile ? `Uploading: ${uploadProgress.currentFile}` : 'Uploading...'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {uploadProgress.percent}%
+                {uploadProgress.done !== undefined && uploadProgress.total !== undefined
+                  ? `${uploadProgress.done} / ${uploadProgress.total} files`
+                  : `${uploadProgress.percent}%`}
               </Typography>
             </Box>
             <Typography variant="h6" fontWeight={700} color="primary.main">
@@ -626,6 +928,48 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
             </Typography>
           )}
 
+          {projectPath && rootFolder && folders.length === 0 && files.length === 0 && canUpload && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 4,
+                textAlign: 'center',
+                border: '2px dashed',
+                borderColor: 'grey.300',
+                borderRadius: 3,
+                background: 'linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%)',
+              }}
+            >
+              <CloudUploadOutlined sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+              <Typography variant="body1" fontWeight={600} sx={{ mb: 0.5 }}>
+                No files in this folder
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Create a folder or upload files to get started
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() => setCreateFolderOpen(true)}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  New Folder
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={<CloudUploadOutlined />}
+                  onClick={handleUpload}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  Upload
+                </Button>
+              </Box>
+            </Paper>
+          )}
+
           {folders.length === 0 && files.length === 0 && !projectPath && (
             <Paper
               elevation={0}
@@ -668,14 +1012,13 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
               sx={{
                 display: 'grid',
                 gridTemplateColumns: {
-                  xs: 'repeat(auto-fill, minmax(90px, 1fr))',
-                  sm: 'repeat(auto-fill, minmax(100px, 1fr))',
-                  md: 'repeat(auto-fill, minmax(110px, 1fr))',
+                  xs: 'repeat(auto-fill, minmax(120px, 1fr))',
+                  sm: 'repeat(auto-fill, minmax(140px, 1fr))',
+                  md: 'repeat(auto-fill, minmax(150px, 1fr))',
                 },
                 gap: { xs: 1.5, sm: 2 },
                 mb: 2,
-                // bgcolor: '#ffffff',
-                p: 2,
+                p: 1,
                 borderRadius: 1,
               }}
             >
@@ -772,89 +1115,169 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
                   </IconButton>
                 </Box>
               ))}
-              {files.map((file) => (
-                <Box
-                  key={file.id}
-                  onClick={() => handleDownload(file)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setContextMenu({ anchor: e.currentTarget as HTMLElement, item: file })
-                  }}
-                  sx={{
-                    position: 'relative',
-                    py: 1.5,
-                    px: 0.5,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    cursor: 'pointer',
-                    borderRadius: 1,
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      bgcolor: 'rgba(25, 118, 210, 0.08)',
-                      transform: 'scale(1.05)',
-                      '& .grid-item-more': { opacity: 1 },
-                      '& .grid-file-icon': {
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                        borderColor: 'primary.light',
-                      },
-                    },
-                  }}
-                >
+              {files.map((file) => {
+                const isImage = isImageFile(file.mimeType)
+                return (
                   <Box
-                    className="grid-file-icon"
+                    key={file.id}
+                    onClick={() => handleDownload(file)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setContextMenu({ anchor: e.currentTarget as HTMLElement, item: file })
+                    }}
                     sx={{
-                      width: 64,
-                      height: 64,
+                      position: 'relative',
+                      py: isImage ? 0 : 1.5,
+                      px: isImage ? 0 : 0.5,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      mb: 1,
-                      bgcolor: '#fff',
-                      border: '1px solid',
-                      borderColor: 'grey.300',
-                      borderRadius: 0.5,
-                      transition: 'all 0.2s ease',
-                      '& svg': { fontSize: 36 },
-                    }}
-                  >
-                    {getFileIcon(file.mimeType)}
-                  </Box>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 400,
-                      textAlign: 'center',
+                      cursor: 'pointer',
+                      borderRadius: isImage ? 2 : 1,
                       overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: '100%',
-                      color: '#000',
-                      fontSize: '0.8125rem',
+                      transition: 'all 0.2s ease',
+                      border: isImage ? '1px solid' : 'none',
+                      borderColor: 'grey.200',
+                      '&:hover': {
+                        bgcolor: isImage ? 'transparent' : 'rgba(25, 118, 210, 0.08)',
+                        transform: 'scale(1.04)',
+                        boxShadow: isImage ? '0 4px 16px rgba(0,0,0,0.14)' : 'none',
+                        '& .grid-item-more': { opacity: 1 },
+                        '& .grid-file-icon': {
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                          borderColor: 'primary.light',
+                        },
+                        '& .img-overlay': { opacity: 1 },
+                      },
                     }}
                   >
-                    {file.name}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    className="grid-item-more"
-                    sx={{
-                      position: 'absolute',
-                      top: 0,
-                      right: 0,
-                      opacity: 0,
-                      p: 0.25,
-                      '&:hover': { bgcolor: 'grey.200' },
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setContextMenu({ anchor: e.currentTarget, item: file })
-                    }}
-                  >
-                    <MoreVert sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Box>
-              ))}
+                    {isImage ? (
+                      /* Image thumbnail – fills grid cell */
+                      <Box sx={{ width: '100%', position: 'relative' }}>
+                        <Box
+                          sx={{
+                            width: '100%',
+                            paddingTop: '75%',  // 4:3 aspect ratio
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '8px 8px 0 0',
+                          }}
+                        >
+                          <Box sx={{ position: 'absolute', inset: 0 }}>
+                            <ImageThumbnail fileId={file.id} alt={file.name} />
+                          </Box>
+                          {/* Hover overlay */}
+                          <Box
+                            className="img-overlay"
+                            sx={{
+                              position: 'absolute',
+                              inset: 0,
+                              bgcolor: 'rgba(0,0,0,0.28)',
+                              opacity: 0,
+                              transition: 'opacity 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{ color: 'white', fontWeight: 600 }}
+                            >
+                              Download
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box
+                          sx={{
+                            px: 1,
+                            py: 0.5,
+                            bgcolor: 'background.paper',
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            noWrap
+                            sx={{
+                              display: 'block',
+                              color: 'text.primary',
+                              fontWeight: 500,
+                              fontSize: '0.72rem',
+                            }}
+                          >
+                            {file.name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{ color: 'text.disabled', fontSize: '0.65rem' }}
+                          >
+                            {formatSize(file.size)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      /* Non-image file – icon */
+                      <>
+                        <Box
+                          className="grid-file-icon"
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 1,
+                            bgcolor: '#fff',
+                            border: '1px solid',
+                            borderColor: 'grey.300',
+                            borderRadius: 0.5,
+                            transition: 'all 0.2s ease',
+                            '& svg': { fontSize: 36 },
+                          }}
+                        >
+                          {getFileIcon(file.mimeType)}
+                        </Box>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 400,
+                            textAlign: 'center',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: '100%',
+                            color: '#000',
+                            fontSize: '0.8125rem',
+                          }}
+                        >
+                          {file.name}
+                        </Typography>
+                      </>
+                    )}
+                    <IconButton
+                      size="small"
+                      className="grid-item-more"
+                      sx={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 2,
+                        opacity: 0,
+                        p: 0.25,
+                        bgcolor: 'rgba(255,255,255,0.85)',
+                        backdropFilter: 'blur(4px)',
+                        '&:hover': { bgcolor: 'white' },
+                        zIndex: 1,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setContextMenu({ anchor: e.currentTarget, item: file })
+                      }}
+                    >
+                      <MoreVert sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                )
+              })}
             </Box>
           ) : (
             <Paper
@@ -1052,7 +1475,7 @@ export function FileExplorer({ projectPath, serviceId }: FileExplorerProps = {})
         open={createFolderOpen}
         onClose={() => setCreateFolderOpen(false)}
         onSubmit={handleCreateFolder}
-        loading={createFolder.isPending}
+        loading={createFolderMutation.isPending}
       />
 
       <RenameDialog

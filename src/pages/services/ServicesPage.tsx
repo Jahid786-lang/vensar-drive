@@ -5,22 +5,39 @@ import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
 import TextField from '@mui/material/TextField'
 import InputAdornment from '@mui/material/InputAdornment'
+import Button from '@mui/material/Button'
 import SearchOutlined from '@mui/icons-material/SearchOutlined'
 import AppsOutlined from '@mui/icons-material/AppsOutlined'
 import ArrowForward from '@mui/icons-material/ArrowForward'
 import SearchOffOutlined from '@mui/icons-material/SearchOffOutlined'
-import { useAppSelector } from '@/store/hooks'
-import { selectServicesList } from '@/store/servicesSlice'
-import type { ServiceItem } from '@/data/servicesData'
+import AddCircleOutlined from '@mui/icons-material/AddCircleOutlined'
+import { useServices, useSeedServices } from '@/hooks/useServices'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { isAdminOrAbove } from '@/constants/roles'
+import { iconRegistry } from '@/data/servicesData'
+import type { SvgIconComponent } from '@mui/icons-material'
+import BoltOutlined from '@mui/icons-material/BoltOutlined'
 
-function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (id: string) => void }) {
-  const Icon = service.icon
+function getServiceIcon(serviceIcon: string | null, serviceId: string): SvgIconComponent {
+  const iconId = serviceIcon || serviceId
+  return (iconRegistry[iconId] ?? BoltOutlined) as SvgIconComponent
+}
+
+function ServiceCard({
+  service,
+  onSelect,
+}: {
+  service: { id: string; serviceId: string; serviceName: string; serviceIcon: string | null }
+  onSelect: (id: string) => void
+}) {
+  const Icon = getServiceIcon(service.serviceIcon, service.serviceId)
   return (
     <Paper
         component="button"
         type="button"
         variant="outlined"
-        onClick={() => onSelect(service.id)}
+        onClick={() => onSelect(service.serviceId)}
         sx={{
           width: '100%',
           minHeight: 140,
@@ -93,7 +110,7 @@ function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (i
             color: 'text.primary',
           }}
         >
-          {service.label}
+          {service.serviceName}
         </Typography>
         <Box
           className="service-arrow"
@@ -119,13 +136,50 @@ function ServiceCard({ service, onSelect }: { service: ServiceItem; onSelect: (i
 export function ServicesPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
-  const servicesList = useAppSelector(selectServicesList)
+  const { user } = useAuth()
+  const { showToast } = useToast()
+  const { data: servicesList = [], isLoading, error } = useServices()
+  const seedServices = useSeedServices()
+
+  const handleSeed = async () => {
+    try {
+      const res = await seedServices.mutateAsync()
+      showToast(`Seeded ${res.seeded} services`, 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Seed failed', 'error')
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return servicesList
-    return servicesList.filter((s) => s.label.toLowerCase().includes(q))
+    let list = q
+      ? servicesList.filter((s) => s.serviceName.toLowerCase().includes(q))
+      : [...servicesList]
+    list = list.sort((a, b) => {
+      if (a.serviceId === 'irrigation') return -1
+      if (b.serviceId === 'irrigation') return 1
+      return (a.serviceName ?? '').localeCompare(b.serviceName ?? '')
+    })
+    return list
   }, [search, servicesList])
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+        <Typography color="text.secondary">Loading services...</Typography>
+      </Box>
+    )
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Typography color="error">
+          {error instanceof Error ? error.message : 'Failed to load services'}
+        </Typography>
+      </Box>
+    )
+  }
 
   return (
     <Box
@@ -134,7 +188,6 @@ export function ServicesPage() {
         mx: 'auto',
         width: '100%',
         minWidth: 0,
-        // px: { xs: 2, sm: 3 },
         py: { xs: 0.5, sm: 1 },
       }}
     >
@@ -150,7 +203,7 @@ export function ServicesPage() {
           borderColor: 'primary.alpha20',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 0.5 }}>
           <Box
             sx={{
@@ -215,6 +268,15 @@ export function ServicesPage() {
             },
           }}
         />
+        {/* <Button
+          variant="contained"
+          size="small"
+          startIcon={<AddCircleOutlined />}
+          onClick={() => navigate('/services/create')}
+          sx={{ textTransform: 'none', fontWeight: 600 }}
+        >
+          Create Service
+        </Button> */}
         </Box>
       </Box>
 
@@ -228,11 +290,52 @@ export function ServicesPage() {
         {filtered.length > 0 ? (
           filtered.map((service) => (
             <ServiceCard
-              key={service.id}
+              key={service.serviceId}
               service={service}
               onSelect={(id) => navigate(`/services/${id}`)}
             />
           ))
+        ) : servicesList.length === 0 ? (
+          <Box
+            sx={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              py: 8,
+              px: 2,
+              borderRadius: 3,
+              bgcolor: 'action.hover',
+              border: '1px dashed',
+              borderColor: 'divider',
+            }}
+          >
+            <AppsOutlined sx={{ fontSize: 56, color: 'text.disabled', mb: 1.5 }} />
+            <Typography variant="body1" color="text.secondary" fontWeight={500}>
+              No services yet
+            </Typography>
+            <Typography variant="body2" color="text.disabled" sx={{ mt: 0.5, mb: 2 }}>
+              Create your first service to get started
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                startIcon={<AddCircleOutlined />}
+                onClick={() => navigate('/services/create')}
+                sx={{ textTransform: 'none' }}
+              >
+                Create Service
+              </Button>
+              {isAdminOrAbove(user?.role) && (
+                <Button
+                  variant="outlined"
+                  onClick={handleSeed}
+                  disabled={seedServices.isPending}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {seedServices.isPending ? 'Seeding...' : 'Seed initial services'}
+                </Button>
+              )}
+            </Box>
+          </Box>
         ) : (
           <Box
             sx={{

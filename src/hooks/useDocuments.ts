@@ -5,7 +5,14 @@ import {
   type DocumentFolder,
   type DocumentFile,
 } from '@/api/documentsApi'
-import { createFolder, updateFolder, deleteFolder } from '@/api/folders'
+import {
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  deleteFolderRecursive,
+  ensureProjectRootFolder,
+  type FlatFolder,
+} from '@/api/folders'
 import {
   uploadFile,
   renameFile,
@@ -14,6 +21,8 @@ import {
   downloadFile,
 } from '@/api/filesApi'
 
+export { type DocumentFolder, type DocumentFile }
+
 export const DOCUMENTS_QUERY_KEY = ['documents']
 export const DOCUMENTS_SEARCH_QUERY_KEY = ['documents', 'search']
 
@@ -21,30 +30,46 @@ export function useDocuments(
   folderId: string | null,
   projectPath?: string | null,
   serviceId?: string | null,
+  projectId?: string | null,
 ) {
   return useQuery({
-    queryKey: [...DOCUMENTS_QUERY_KEY, folderId ?? 'root', projectPath ?? 'global', serviceId ?? ''],
-    queryFn: () => fetchDocuments(folderId, projectPath, serviceId),
+    queryKey: [
+      ...DOCUMENTS_QUERY_KEY,
+      folderId ?? 'root',
+      serviceId ?? '',
+      projectId ?? '',
+      projectPath ?? '',
+    ],
+    queryFn: () => fetchDocuments(folderId, projectPath, serviceId, projectId),
     staleTime: 1000 * 30,
   })
 }
 
-export function useDocumentsSearch(query: string) {
+export function useDocumentsSearch(
+  query: string,
+  serviceId?: string | null,
+  projectId?: string | null,
+) {
   return useQuery({
-    queryKey: [...DOCUMENTS_SEARCH_QUERY_KEY, query],
-    queryFn: () => searchDocuments(query),
+    queryKey: [...DOCUMENTS_SEARCH_QUERY_KEY, query, serviceId ?? '', projectId ?? ''],
+    queryFn: () => searchDocuments(query, serviceId, projectId),
     enabled: query.trim().length > 0,
     staleTime: 1000 * 30,
   })
 }
 
-export function useCreateFolder(folderId: string | null, projectPath?: string | null, serviceId?: string | null) {
+export function useCreateFolder(
+  serviceId?: string | null,
+  projectId?: string | null,
+) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (name: string) =>
+    mutationFn: ({ name, parentId }: { name: string; parentId: string | null }) =>
       createFolder({
         name,
-        parentId: folderId && folderId !== 'root' ? folderId : null,
+        parentId,
+        serviceId: serviceId || null,
+        projectId: projectId || null,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
@@ -83,16 +108,55 @@ export function useDeleteFolder() {
   })
 }
 
-export function useUploadFile(folderId: string | null) {
+export function useDeleteFolderRecursive() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteFolderRecursive(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
+      qc.invalidateQueries({ queryKey: ['folders'] })
+    },
+  })
+}
+
+export function useEnsureProjectRoot() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      serviceId,
+      projectId,
+    }: {
+      serviceId: string
+      projectId: string
+    }) => ensureProjectRootFolder(serviceId, projectId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
+      qc.invalidateQueries({ queryKey: ['folders'] })
+    },
+  })
+}
+
+export function useUploadFile(
+  serviceId?: string | null,
+  projectId?: string | null,
+) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
       file,
+      folderId,
       onProgress,
     }: {
       file: File
+      folderId: string | null
       onProgress?: (percent: number) => void
-    }) => uploadFile(file, folderId, onProgress),
+    }) => uploadFile(
+      file,
+      folderId,
+      onProgress,
+      serviceId,
+      projectId,
+    ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY })
     },

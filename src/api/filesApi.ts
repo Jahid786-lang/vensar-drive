@@ -24,19 +24,21 @@ export async function uploadFile(
   file: File,
   folderId: string | null,
   onProgress?: (percent: number) => void,
+  serviceId?: string | null,
+  projectId?: string | null,
 ): Promise<FileItem> {
   const formData = new FormData()
   formData.append('file', file)
   if (folderId && folderId !== 'root') {
     formData.append('folderId', folderId)
   }
+  if (serviceId) formData.append('serviceId', serviceId)
+  if (projectId) formData.append('projectId', projectId)
   const { data } = await apiClient.post<FileItem>(
     '/files/upload',
     formData,
     {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (e) => {
         if (e.total && onProgress) {
           onProgress(Math.round((e.loaded / e.total) * 100))
@@ -59,13 +61,18 @@ export async function deleteFile(id: string): Promise<void> {
   await api.delete(`/files/${id}`)
 }
 
+/**
+ * Download a file.
+ * For S3 files the backend redirects to a presigned URL – browser follows redirect.
+ * For local files the backend streams the file.
+ */
 export async function downloadFile(fileId: string, fileName: string): Promise<void> {
   const { getDecryptedToken } = await import('@/lib/authStorage')
   const token = getDecryptedToken()
-  const base = API_BASE || ''
-  const url = `${base}/files/${fileId}/download`
+  const url = `${API_BASE}/files/${fileId}/download`
   const res = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    redirect: 'follow',
   })
   if (!res.ok) throw new Error('Download failed')
   const blob = await res.blob()
@@ -74,4 +81,14 @@ export async function downloadFile(fileId: string, fileName: string): Promise<vo
   a.download = fileName
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+/**
+ * Get a short-lived presigned URL for inline image preview.
+ * Returns null if the file is stored locally (use /download endpoint instead).
+ */
+export async function getFileViewUrl(
+  fileId: string,
+): Promise<{ url: string | null; mimeType?: string }> {
+  return api.get<{ url: string | null; mimeType?: string }>(`/files/${fileId}/view-url`)
 }
