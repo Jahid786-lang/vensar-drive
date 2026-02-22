@@ -25,7 +25,7 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 const navLinks = [
   { label: "Dashboard", path: "/" },
-  { label: "Documents", path: "/documents" },
+  // { label: "Documents", path: "/documents" },
 ];
 
 // const adminOnlyNavLinks = [{ label: "Events", path: "/events" }];

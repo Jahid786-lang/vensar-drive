@@ -34,12 +34,12 @@ function baseMainItems(_role: UserRole): SidebarNavItem[] {
       path: '/',
       pathPrefix: '/services',
     },
-    {
-      id: 'my-documents',
-      label: 'My Documents',
-      icon: DescriptionOutlined,
-      path: '/documents',
-    },
+    // {
+    //   id: 'my-documents',
+    //   label: 'My Documents',
+    //   icon: DescriptionOutlined,
+    //   path: '/documents',
+    // },
   ]
 
   // if (_role === 'super_admin' || _role === 'admin') {
