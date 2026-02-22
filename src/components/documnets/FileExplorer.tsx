@@ -276,6 +276,10 @@ export function FileExplorer({ projectPath, serviceId, projectId: propProjectId 
    */
   const effectiveFolderId = currentFolderId ?? rootFolder?.id ?? null
 
+  // Ref so handleCreateFolder always uses the latest value even if there's a re-render
+  const effectiveFolderIdRef = useRef<string | null>(null)
+  effectiveFolderIdRef.current = effectiveFolderId
+
   // Sync folder path to NavigationContext (only for My Documents, not project docs)
   useEffect(() => {
     if (!projectPath && foldersFlat) {
@@ -316,7 +320,9 @@ export function FileExplorer({ projectPath, serviceId, projectId: propProjectId 
   })()
 
   const handleCreateFolder = async (name: string) => {
-    await createFolderMutation.mutateAsync({ name, parentId: effectiveFolderId })
+    // Use ref to get the LATEST effectiveFolderId at submit time
+    const parentId = effectiveFolderIdRef.current
+    await createFolderMutation.mutateAsync({ name, parentId })
     showToast('Folder created', 'success')
   }
 
